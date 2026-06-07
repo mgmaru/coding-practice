@@ -161,6 +161,39 @@ git branch -d docs/clarify-purpose-roles-rubric        # ローカル
 git push origin --delete docs/clarify-purpose-roles-rubric   # リモート
 ```
 
+## ブランチの後片付け（マージ方式とは無関係）
+
+**マージ方式（squash / merge / rebase）とブランチ削除は無関係**。マージ方式は「mainへの取り込み方」だけを決め、ブランチを消すかどうかは別の操作。「squashしたから消えた」という因果はない。
+
+さらに **ローカルとリモートのブランチは別物** で、消えるタイミングも違う:
+
+| 対象 | 消える条件 | 補足 |
+|------|-----------|------|
+| **リモート** | ①リポジトリ設定 *Automatically delete head branches* がON／②PR画面の **Delete branch** ボタン／③`gh pr merge --delete-branch`（手元実行）／④`git push origin --delete <branch>` | GitHub側の操作で消える |
+| **ローカル** | `git branch -d`（マージ済みのみ）／`git branch -D`（強制）／`gh pr merge --delete-branch`（手元実行） | **サーバ側のマージでは絶対に消えない** |
+
+> GitHub上でマージしても、手元のクローンは何も知らない（`git fetch` / `git pull` するまで）。だから **ローカルの作業ブランチは自分で消すまで残る**。
+
+### 自動削除の設定を確認・有効化
+
+```bash
+gh repo view --json deleteBranchOnMerge   # 現在の設定（false=手動 / true=自動）
+gh repo edit --delete-branch-on-merge     # マージ時に head ブランチを自動削除する設定にする
+```
+
+自動削除をONにすると、PRマージ時に **リモート** ブランチは自動で消える（ローカルは別途自分で削除）。
+
+### マージ後の掃除コマンド一式
+
+```bash
+git checkout main && git pull origin main      # mainを最新化
+git push origin --delete docs/xxx              # リモートの不要ブランチを削除（自動削除OFFなら手動で）
+git branch -d docs/xxx                         # ローカルブランチを削除（※squashマージ後は -D が必要なことも）
+git fetch --prune                              # 消えたリモートを指す追跡参照を掃除
+```
+
+> ※ **squashマージ後に `-d` が拒否される**: squashはmainに別SHAの新コミットを作るため、gitは元ブランチを「未マージ」と判定して `git branch -d` を拒否することがある。内容がmainに入っていることを確認のうえ `git branch -D`（強制削除）で消す。
+
 ## つまずきポイント
 
 | 症状 | 原因 | 対処 |
@@ -170,6 +203,8 @@ git push origin --delete docs/clarify-purpose-roles-rubric   # リモート
 | vimが開いて抜けられない | 対話モードで本文エディタが起動した | `Esc` → `:wq` → Enter で保存して閉じる。苦手なら `--fill` や `--web` を使う |
 | mainに直接コミットしてしまった | ②のブランチ作成を忘れた | コミット前なら先にブランチを切る。済んだ場合は別途相談 |
 | 見覚えのないブランチが残っている | 過去のpush/作成ミスの残骸 | `git branch` で一覧し、不要なら `git branch -D <名前>` で削除 |
+| マージしたのにブランチが残っている | 自動削除OFF、またはローカルは手動削除が必要 | リモート: `git push origin --delete <branch>`／ローカル: `git branch -d`（拒否時は `-D`）|
+| `git branch -d` が `not fully merged` で拒否される | squashマージで別SHAになり「未マージ」扱い | 内容がmainにあるか確認し `git branch -D` で強制削除 |
 
 ## 用語ミニ辞典
 
