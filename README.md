@@ -40,7 +40,7 @@
 
 ## 進捗
 
-- [ ] **Phase 0**: 環境構築と土台（Git / GitHub / Python環境） — 1週目
+- [x] **Phase 0**: 環境構築と土台（Git / GitHub / Python環境） — 1週目
 - [ ] **Phase 1**: ロジックを組む基礎体力（小さなツールの量産） — 1〜2ヶ月目
 - [ ] **Phase 2**: 実務で通用するコード（可読性 / SRP / pytest / 型 / CI） — 2〜3ヶ月目
 - [ ] **Phase 3**: セキュリティ（OWASP Top 10 / Bandit / CodeQL） — 3〜4ヶ月目
