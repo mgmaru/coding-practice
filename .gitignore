@@ -1,2 +1,13 @@
 # AIとのやり取りを記録するファイル
 /_prompts
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 環境変数（機密は絶対にコミットしない）
+.env
+!.env.example
+
+# 仮想環境
+.venv/

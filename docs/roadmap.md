@@ -52,19 +52,19 @@
 
 **ゴール: 「書いて、コミットして、pushする」が日常動作になる**
 
-- [ ] Python環境構築（uv または pyenv + venv を推奨）
-- [ ] VS Code + 拡張（Python, Ruff）
-- [ ] Git基本操作: clone / add / commit / push / branch / merge
-- [ ] GitHubに学習用リポジトリ作成（**Public**にする — CodeQLを無料で使うため）
-- [ ] 最初のコミット: README.md に学習の目的・動機・完了の定義を書く（既に骨子があれば見直す）
+- [x] Python環境構築（uv または pyenv + venv を推奨）
+- [x] VS Code + 拡張（Python, Ruff）
+- [x] Git基本操作: clone / add / commit / push / branch / merge
+- [x] GitHubに学習用リポジトリ作成（**Public**にする — CodeQLを無料で使うため）
+- [x] 最初のコミット: README.md に学習の目的・動機・完了の定義を書く（既に骨子があれば見直す）
 
 **フェーズ完了の定義（DoD・移行レビューで判定）**
 
-- [ ] `uv sync` で環境が再現でき、`python main.py` が動く — 証跡: コミット済みの `pyproject.toml` / `uv.lock`
-- [ ] GitHub に **Public** でリポジトリが存在する — 証跡: リモートURL
-- [ ] README に「目的・動機・完了の定義」が書かれている — 証跡: 該当コミット
-- [ ] `.gitignore` で `.env` / `__pycache__` を除外している — 証跡: `.gitignore`
-- [ ] **ブランチ → PR → 自分でマージ** の1サイクルを実際に1周した — 証跡: マージ済みPR 1本（[pr-workflow.md](./pr-workflow.md) 通り）
+- [x] `uv sync` で環境が再現でき、`python main.py` が動く — 証跡: コミット済みの `pyproject.toml` / `uv.lock`
+- [x] GitHub に **Public** でリポジトリが存在する — 証跡: リモートURL
+- [x] README に「目的・動機・完了の定義」が書かれている — 証跡: 該当コミット
+- [x] `.gitignore` で `.env` / `__pycache__` を除外している — 証跡: `.gitignore`
+- [x] **ブランチ → PR → 自分でマージ** の1サイクルを実際に1周した — 証跡: マージ済みPR 1本（[pr-workflow.md](./pr-workflow.md) 通り）
 
 > 判定の目安: Phase 0の本丸は「環境が動く」より **「PRを1周回せた」**（＝日常動作化の第一歩）。
 
