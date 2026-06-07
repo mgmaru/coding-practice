@@ -34,17 +34,25 @@ flowchart TD
 flowchart TD
   subgraph DEV["変更者（あなた）"]
     direction TB
-    C["変更してコミット → push"] --> E["PR作成"]
-    FIX["指摘に対応<br/>修正コミット → push"]
+    A["① main を最新化"] --> B["② ブランチを作成"]
+    B --> C["③ 変更してコミット"]
+    C --> D["④ push"]
+    D --> E["⑤ PR を作成"]
+    FIX["③' 修正してコミット"] --> FIXP["④' push（既存PRへ自動反映）"]
+    H["⑦ マージ"] --> I["⑧ 後片付け"]
   end
   subgraph REV["レビュアー（AI）"]
     direction TB
-    RV["PRの差分をレビュー<br/>（review-rubric.md の観点）"] --> G{"判定"}
+    RV["⑥ PRの差分をレビュー<br/>（review-rubric.md の観点）"] --> G{"判定"}
   end
   E -->|"レビュー依頼"| RV
+  FIXP -->|"再レビュー依頼"| RV
   G -->|"差し戻し（指摘あり）"| FIX
-  FIX -->|"再レビュー依頼（PRは自動更新）"| RV
-  G -->|"承認（指摘なし）"| M["マージ → 後片付け（変更者）"]
+  G -->|"承認（指摘なし）"| H
+  I -. 次のサイクル .-> A
+
+  style DEV fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+  style REV fill:#fff3e0,stroke:#e65100,stroke-width:2px
 ```
 
 ①との対比:
