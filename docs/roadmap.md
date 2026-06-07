@@ -9,7 +9,7 @@
   - 2言語目はPhase 4以降に。用途が決まっていないなら、**Go**（CLI・バックエンド、文法がシンプルで2言語目に最適）か **TypeScript**（Web方面）を推奨。**Rust** は所有権など概念の難度が高いため3言語目以降が無難。
 - **AIの使い方（全Phase共通ルール）**:
   1. まず自分で書く（汚くてOK）
-  2. AIにレビューさせる（「改善点と理由を説明して」）
+  2. AIにレビューさせる（観点は [review-rubric.md](./review-rubric.md) に従う。まず自分で同じ観点で自己レビューしてから渡す）
   3. AIに同じものを書かせて差分を読む
   4. 「なぜそう書くのか」を説明できるまで質問する
   - ※ 先にAIに書かせるのは禁止。順番が命。
@@ -30,7 +30,7 @@
 - [ ] VS Code + 拡張（Python, Ruff）
 - [ ] Git基本操作: clone / add / commit / push / branch / merge
 - [ ] GitHubに学習用リポジトリ作成（**Public**にする — CodeQLを無料で使うため）
-- [ ] 最初のコミット: README.md に学習の目的を書く
+- [ ] 最初のコミット: README.md に学習の目的・動機・完了の定義を書く（既に骨子があれば見直す）
 
 > 設計経験者向けメモ: ここで完璧な環境を追求しない。YAGNIの精神で、動いたら次へ。
 
@@ -138,6 +138,7 @@ coding-practice/
 │       ├── ci.yml             # pytest + Ruff + mypy（Phase 2で追加）
 │       └── codeql.yml         # CodeQL（Phase 3で追加 / デフォルトセットアップなら不要）
 ├── docs/
+│   ├── review-rubric.md       # AIレビュアーのレビュー観点
 │   ├── learning-log/          # 週次の学習ログ（YYYY-WW.md）
 │   └── notes/                 # 概念メモ（例: srp.md, sql-injection.md）
 ├── exercises/                 # 小さな演習・ドリル
