@@ -46,6 +46,7 @@ coding-practice/
 │   ├── roadmap.md       # 学習ロードマップ本体
 │   ├── ai-workflow.md   # AIとの役割分担（AIプロダクトオーナー方式）
 │   ├── review-rubric.md # AIレビュアーのレビュー観点
+│   ├── pr-workflow.md   # ブランチ→PR→マージの1サイクル手順
 │   ├── learning-log/    # 週次の学習ログ（YYYY-WW.md）
 │   └── notes/           # 概念メモ（srp.md, sql-injection.md など）
 ├── exercises/          # 演習・ドリル
@@ -59,7 +60,7 @@ coding-practice/
 
 ## 運用ルール
 
-1. 作業はブランチ + Pull Request で行い、CI・CodeQLの指摘に対応してから自分でマージする
+1. 作業はブランチ + Pull Request で行い、CI・CodeQLの指摘に対応してから自分でマージする（手順とフロー図: [docs/pr-workflow.md](docs/pr-workflow.md)）
 2. ツール開発はIssue駆動（AIがPO役として発行したチケットをIssueに登録し、仕様の質疑もIssueコメントに残す）
 3. `exercises/04_security/` 配下のコードは学習目的で**意図的に脆弱**。実環境では使用しないこと
 4. 週1回 `docs/learning-log/` に「やったこと・学んだこと・次にやること」を記録する
