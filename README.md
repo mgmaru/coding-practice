@@ -35,7 +35,9 @@
 - [ ] **Phase 3**: セキュリティ（OWASP Top 10 / Bandit / CodeQL） — 3〜4ヶ月目
 - [ ] **Phase 4**: 統合プロジェクト（別リポジトリで開発） — 4〜6ヶ月目
 
-各Phaseの詳細とマイルストーン: [docs/roadmap.md](docs/roadmap.md)
+> 各Phaseのチェック ＝「**フェーズ移行レビュー**」を通過した印（自己検収 ＋ AI検収 → 自分が昇格判断）。承認者を外部に置かず、自己バイアスを防ぐチェックポイントとして運用する。
+
+各Phaseの詳細・完了の定義（DoD）・移行レビューの手順: [docs/roadmap.md](docs/roadmap.md)
 
 ## ディレクトリ構成
 
