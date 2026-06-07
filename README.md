@@ -22,8 +22,8 @@
 
 | トラック | 場所 | 題材を決める人 | サイクル |
 |---|---|---|---|
-| ドリル | `exercises/` | 外部教材（Exercism等）または自分 | 短（模範解答と比較）|
-| プロジェクト/ツール | `tools/` | **自分**（機能チケットはAIがPO役で発行）| 長（Issue → 実装 → 自己検収）|
+| ドリル | `phaseN/<topic>/` | 外部教材（Exercism等）または自分 | 短（模範解答と比較）|
+| プロジェクト/ツール | `phaseN/<tool>/`（作成フェーズに置く）| **自分**（機能チケットはAIがPO役で発行）| 長（Issue → 実装 → 自己検収）|
 
 役割分担の詳細とフロー: [docs/ai-workflow.md](docs/ai-workflow.md) ／ レビュー観点: [docs/review-rubric.md](docs/review-rubric.md)
 
@@ -44,27 +44,33 @@
 ```
 coding-practice/
 ├── README.md           # このファイル（全体像と進捗）
-├── docs/
+├── pyproject.toml      # 依存・Ruff/mypy設定
+├── .github/workflows/  # ci.yml（Phase 2〜）, codeql.yml（Phase 3〜）
+├── docs/               # ★横断ドキュメント（フェーズに紐づかない）
 │   ├── roadmap.md       # 学習ロードマップ本体
 │   ├── ai-workflow.md   # AIとの役割分担（AIプロダクトオーナー方式）
 │   ├── review-rubric.md # AIレビュアーのレビュー観点
 │   ├── pr-workflow.md   # ブランチ→PR→マージの1サイクル手順
 │   ├── learning-log/    # 週次の学習ログ（YYYY-WW.md）
 │   └── notes/           # 概念メモ（srp.md, sql-injection.md など）
-├── exercises/          # 演習・ドリル
-│   ├── 01_basics/
-│   ├── 02_refactoring/
-│   ├── 03_testing/
-│   └── 04_security/    # 脆弱版と修正版をペアで残す（意図的に脆弱なコードを含む）
-├── tools/              # 実用ミニツール群（各ツールにtests/を持つ）
-└── .github/workflows/  # ci.yml（Phase 2〜）, CodeQL（Phase 3〜）
+├── phase1/             # ロジック基礎: 文法ドリル＋自作ツール
+│   ├── basics/          # 文法・小スクリプトのドリル
+│   └── log_analyzer/    # 自作ツール（main.py, tests/, README.md）
+├── phase2/             # 実務品質: リファクタ／テスト演習＋新規ツール
+│   ├── refactoring/     # リファクタ前後をペアで残す
+│   └── testing/         # pytest演習
+└── phase3/             # セキュリティ
+    └── security/        # 脆弱版と修正版をペアで残す（意図的に脆弱なコードを含む）
 ```
+
+> **フォルダ＝フェーズ。ただしツールは「作成フェーズ」に置いて以降は動かさない** — 後フェーズの改修（P2でテスト追加・リファクタ、P3でセキュリティ点検）は、そのファイルを**その場で編集**する（別フェーズへコピー/移動しない）。フェーズ番号＝**着手時期**で、経緯はツール直下 README の履歴＋git＋learning-log が表す。
+> **Phase 0** はフォルダなし（成果物は root 設定と `docs/`）／**Phase 4** は別リポジトリ（成果物リポジトリ）／`docs/` だけはフェーズに属さない横断置き場。
 
 ## 運用ルール
 
 1. 作業はブランチ + Pull Request で行い、CI・CodeQLの指摘に対応してから自分でマージする（手順とフロー図: [docs/pr-workflow.md](docs/pr-workflow.md)）
 2. ツール開発はIssue駆動（AIがPO役として発行したチケットをIssueに登録し、仕様の質疑もIssueコメントに残す）
-3. `exercises/04_security/` 配下のコードは学習目的で**意図的に脆弱**。実環境では使用しないこと
+3. `phase3/security/` 配下のコードは学習目的で**意図的に脆弱**。実環境では使用しないこと
 4. 週1回 `docs/learning-log/` に「やったこと・学んだこと・次にやること」を記録する
 5. AIが書いたコードを採用した場合は、その旨と自分が検証した内容をコミットメッセージに残す
 
