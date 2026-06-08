@@ -20,6 +20,7 @@
 | 型の整合 | mypy / pyright |
 | 既知の脆弱パターン（SAST） | Bandit / Semgrep / CodeQL |
 
+> ツール名は Python の例。他言語は同等物に読み替える（lint/format・型チェッカ・SAST）。Rust の SAST は `cargo-audit` + `clippy`（CodeQL 対応はプレビュー段階）。詳細は [roadmap.md](./roadmap.md) の言語戦略。
 > ここを人間やAIが手でレビューするのは時間の無駄。CIに任せ、指摘が出たら直す。
 
 ### 層1: AIレビュアーが見る（ツールが見られない層）
