@@ -86,6 +86,8 @@ coding-practice/
 - **宣言ファイル vs ロックファイルの違い**: 宣言は「だいたいこの版以上」とゆるく書く（人間が編集）。ロックは「**まさにこの版**」を機械が固定する（自動生成）。両方あることで「自分の手元でも他人の手元でも同じものが入る（再現性）」が成立する。
 - **隔離場所はコミットしない**: `.venv/` や `node_modules/` や `target/` は「宣言ファイルから再生成できる成果物」なので Git に入れない（`.gitignore` で無視する。後述）。
 
+> これらの宣言ファイル・隔離場所を、`phaseN/` 配下のドリル/ツール**フォルダごとに作るのか・言語ルートの1個を共有するのか**は言語で異なる → セクション5「フォルダを増やすとき」を参照。
+
 ---
 
 ## 4. 「Go と Rust に “仮想環境” は無い」— よくある誤解
@@ -106,7 +108,108 @@ Python に慣れていると「Go の venv は？Rust の venv は？」と探�
 
 ---
 
-## 5. 手順（各ステップが何をしているか）
+## 5. フォルダを増やすとき — 宣言ファイルと隔離場所はどの粒度か
+
+`phaseN/` 配下にドリル／ツールのフォルダを増やしていくと、必ずこの疑問にぶつかる:
+
+> 「宣言ファイル（`go.mod` など）や隔離場所（`node_modules` など）は、**フォルダごとに1つずつ作る**のか？ それとも**1つを共有**するのか？」
+
+答えは **言語で2系統に分かれる**。ここが多言語構成でいちばん挙動が違う所なので、独立した節にする。
+
+### 5.1 結論 — 2つのモデル
+
+| モデル | 中身 | どの言語 |
+|--------|------|----------|
+| **A. 1つの器を共有** | 宣言ファイルは**言語ルートに1個だけ**。配下のフォルダは「ただのソース置き場」で、宣言ファイルも隔離場所も**持たず、ルートの1個を共有**する | **Python / TypeScript / Go** |
+| **B. crate ごとに宣言＋workspaceで集約** | フォルダ（crate）**ごとに `Cargo.toml` が必須**。ただし隔離場所（`target/`）とロックは workspace ルートに**1個へ集約**される | **Rust** |
+
+### 5.2 言語別の粒度（一覧）
+
+| 言語 | 宣言ファイル | 配下フォルダに宣言ファイルは要る？ | 隔離場所 | モデル |
+|------|------------|--------------------------------|---------|--------|
+| **Python** | `python/pyproject.toml`（1個） | **不要**（`.py` を置くだけ） | `python/.venv/`（1個・共有） | A |
+| **TypeScript** | `typescript/package.json`（1個） | **不要**（`.ts` を置くだけ） | `typescript/node_modules/`（1個・共有） | A |
+| **Go** | `go/go.mod`（1個） | **不要**（`.go` を置く＝1フォルダ1パッケージ） | **マシン全体**のモジュールキャッシュ（共有） | A |
+| **Rust** | `rust/Cargo.toml`（`[workspace]`）＋**各 crate の `Cargo.toml`** | **要る**（crate ごと） | `rust/target/`（1個・共有） | B |
+
+> ひとことで言うと: **Python / TS / Go は「ルートに1個・配下は共有」、Rust だけ「crate ごとに1個（＋workspace用に1個）」**。
+
+### 5.3 なぜ違うのか — 「依存を持つ単位」が言語で違う
+
+各言語が「1つのまとまり」とみなす単位が異なるため、宣言ファイルの置き方が変わる。
+
+| 言語 | 依存を持つ単位 | その単位は何を内包するか |
+|------|--------------|------------------------|
+| Python | **環境/プロジェクト**（`.venv` + `pyproject.toml`） | 配下の全 `.py`・サブパッケージ |
+| Node(TS) | **package**（`package.json`） | 配下の全 `.ts`（解決は上方向に探索＝後述） |
+| Go | **module**（`go.mod`） | 1モジュール＝**多数のパッケージ（フォルダ）**を内包 |
+| Rust | **crate**（`Cargo.toml`） | 1バイナリ/ライブラリ＝1 crate。**workspace** が複数 crate を束ねる |
+
+→ A系（Python/TS/Go）は「**大きな器が1つ、その中に多数のフォルダが相乗り**」。Rust は「**小さな crate を多数作り、workspace で束ねる**」。学習用にドリルを大量に作るとき、A系は相乗りで楽、Rust は crate が増えるが lock と `target/` は1か所に集まる。
+
+### 5.4 図 — モデルAとモデルBの配置
+
+**モデルA（例: TypeScript）** — 宣言も隔離場所もルートに1個、配下は共有:
+
+```
+typescript/
+├── package.json        ← 依存はここに宣言（1個だけ）
+├── pnpm-lock.yaml      ← ロックも1個
+├── node_modules/       ← ★隔離場所は1個。全ドリルが共有
+└── phase1/
+    ├── basics/foo.ts       ← 宣言ファイルも node_modules も持たない
+    └── log_tool/bar.ts     ←  〃（上の node_modules を共有して import できる）
+```
+
+（Python なら `pyproject.toml`/`uv.lock`/`.venv/` が、Go なら `go.mod` が、同じく `言語/` ルートに1個。）
+
+**モデルB（Rust）** — crate ごとに宣言ファイル、ロックと `target/` は workspace に集約:
+
+```
+rust/
+├── Cargo.toml          ← [workspace] のみ（自身はパッケージではない）
+├── Cargo.lock          ← ロックは1個（workspace で集約）
+├── target/             ← ★隔離場所は1個。全 crate が共有
+└── phase1/
+    ├── hello/
+    │   ├── Cargo.toml      ← ★crate ごとに宣言ファイルが要る（[package]/[dependencies]）
+    │   └── src/main.rs
+    └── parser/
+        ├── Cargo.toml      ←  〃
+        └── src/main.rs
+```
+
+### 5.5 `node_modules` はなぜ1個で足りるのか（Node の上方向探索）
+
+モデルAの中でも TypeScript は「なぜ配下フォルダに `node_modules` が要らないのか」が分かりにくい。理由は **Node の解決ルール**: `import` 時、Node は**そのファイルから親ディレクトリへ上へ上へと `node_modules` を探す**。
+
+```
+typescript/phase1/basics/foo.ts で  import { z } from "zod"
+   探索: basics/node_modules?      → 無い、ひとつ上へ
+        phase1/node_modules?       → 無い、ひとつ上へ
+        typescript/node_modules?   → ★ここで見つかる（解決成功）
+```
+
+だから **`typescript/` の1個に `pnpm add` で足していけばよく、各ドリルフォルダに `node_modules` を作る必要はない**（`pnpm add` は `package.json` のある `typescript/` で実行する）。Python の `.venv` も同様にルートの1個を共有する。
+
+### 5.6 ドリル／ツールを1個足す手順（言語別）
+
+| 言語 | フォルダ追加 | 依存を足す | 動かす |
+|------|------------|-----------|-------|
+| **Python** | `python/phase1/x/` に `.py` を置く | `python/` で `uv add <pkg>` | `uv run python phase1/x/foo.py` |
+| **TypeScript** | `typescript/phase1/x/` に `.ts` を置く | `typescript/` で `pnpm add <pkg>`（開発用は `-D`） | 型チェック `pnpm exec tsc --noEmit`／テスト `pnpm exec vitest`（`.ts` を直接実行したいなら `pnpm add -D tsx` → `pnpm exec tsx phase1/x/foo.ts`） |
+| **Go** | `go/phase1/x/` に `.go`（実行物は `package main`） | `go/` 内で `go get <module>` | `go run ./phase1/x` |
+| **Rust** | `rust/` で `cargo new phase1/x`（`Cargo.toml`＋`src/` が自動生成。`members=["phase1/*"]` で workspace に自動参加） | その crate 内で `cargo add <crate>`（または `rust/` で `cargo add <crate> -p x`） | `rust/` で `cargo run -p x` |
+
+> 多くの文法ドリルは**外部依存ゼロ**で足りる（TS は既に入っている `typescript`/`vitest`、Python は標準ライブラリ）。`add` 系コマンドの出番はそれほど多くない。
+
+### 5.7 いつ「フォルダごとに分ける」のか（例外）
+
+モデルAでも、**ツールAとツールBで同じライブラリの非互換なバージョンが要る**等のケースでは、サブプロジェクトを分ける（Python は別 `pyproject.toml`、TS は pnpm workspaces のモノレポ化、Go は `go.work` で複数モジュール）。ただし**学習用では基本不要**で、1か所共有で十分。Rust は設計上つねに crate 単位なので、この心配は元から無い。
+
+---
+
+## 6. 手順（各ステップが何をしているか）
 
 > 実際の作業は **ブランチ上**で行う（`docs/pr-workflow.md` のルール: main に直接コミットしない）。
 
@@ -329,7 +432,7 @@ python/.venv/
 
 ---
 
-## 6. 検収（受け入れ条件）
+## 7. 検収（受け入れ条件）
 
 各言語の世界が独立して動くことを確認する:
 
@@ -344,7 +447,7 @@ python/.venv/
 
 ---
 
-## 7. 移行に伴って更新する他のドキュメント（実装後でよい）
+## 8. 移行に伴って更新する他のドキュメント（実装後でよい）
 
 - **README「ディレクトリ構成」**: いまの *フォルダ = フェーズ* から、*言語 / フェーズ / トラック* の3軸に書き換える。
 - **roadmap「言語戦略」**: 「**器は多言語対応・学習は1言語集中のまま**」という注記を足す（並行学習の許可ではないと明記）。
@@ -353,7 +456,7 @@ python/.venv/
 
 ---
 
-## 8. 用語ミニ辞典
+## 9. 用語ミニ辞典
 
 | 用語 | 意味 |
 |------|------|
