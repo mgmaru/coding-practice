@@ -97,7 +97,7 @@ git pull origin main
 ```bash
 git checkout -b docs/clarify-purpose-roles-rubric
 ```
-`-b` は「作って切り替える」。ブランチ名は **種別/内容** の形が分かりやすい（例: `docs/...`, `feat/...`, `fix/...`）。
+`-b` は「作って切り替える」。ブランチ名は **`<type>/<短い説明>`** の形にする（命名規則の正本は [branch-naming.md](./branch-naming.md)）。
 今いるブランチは `git branch --show-current` で確認できる。
 
 ### ③ 変更してコミット
@@ -105,7 +105,7 @@ git checkout -b docs/clarify-purpose-roles-rubric
 git add README.md docs/review-rubric.md   # 対象を指定（"git add ." は不要なものまで入りやすい）
 git commit -m "変更の要約（何をなぜ変えたか）"
 ```
-コミットメッセージも練習対象。1行目に要約、本文に理由を書く。
+コミットメッセージも練習対象。1行目に要約、本文に理由を書く。`--squash` では **PRタイトルが main のコミットになる** ので、メッセージの書き方は [pr-writing.md](./pr-writing.md) を参照。
 
 ### ④ リモートへ push
 ```bash
@@ -128,6 +128,7 @@ gh pr create --fill        # コミット内容からタイトル・本文を自
 | `gh pr create --web` | ブラウザのPR作成画面を開く |
 
 base（マージ先）は自動で `main`、head（変更元）は今のブランチになる。
+**タイトル・本文に何を書くか**は [pr-writing.md](./pr-writing.md) を参照（Issueを閉じるなら本文に `Closes #<番号>`）。
 
 ### ⑥ 自己レビュー / CI確認
 ```bash
