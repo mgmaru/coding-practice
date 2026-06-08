@@ -69,6 +69,9 @@ coding-practice/
 │   ├── ai-workflow.md           # AIとの役割分担（AIプロダクトオーナー方式）
 │   ├── review-rubric.md         # AIレビュアーのレビュー観点
 │   ├── pr-workflow.md           # ブランチ→PR→マージの1サイクル手順
+│   ├── branch-naming.md         # ブランチ命名規則（type語彙の正本）
+│   ├── issue-writing.md         # Issueの書き方（構造・受け入れ条件）
+│   ├── pr-writing.md            # PRの書き方（タイトル=コミット・本文）
 │   ├── multi-language-setup.md  # 多言語対応への移行ガイド（環境構築メモ）
 │   ├── learning-log/            # 週次の学習ログ（YYYY-WW.md）
 │   └── notes/                   # 概念メモ（srp.md, sql-injection.md など）
