@@ -167,16 +167,19 @@ uv sync
 
 ### ステップ 2: TypeScript（pnpm）の世界を作る
 
-#### インストール（初回のみ）: Node.js（＋ pnpm）
+#### インストール（初回のみ）: Node.js + corepack
 
 ```bash
-brew install node        # Node.js 本体を入れる（npm と corepack が同梱される）
-node -v                  # 入ったか確認
-corepack enable          # 同梱の corepack を有効化（pnpm の版を自動で揃えられるようになる）
+brew install node        # Node.js 本体を入れる（npm が同梱される）
+brew install corepack    # corepack を入れる（最近の Node/Homebrew では別 formula）
+corepack enable          # corepack を有効化（pnpm の版を自動で揃えられるようになる）
+node -v && corepack --version   # 入ったか確認
 ```
 
 - **なぜ Node を入れるのか**: TypeScript は最終的に JavaScript として **Node.js（JS の実行環境）** の上で動く。pnpm も Node の上で動くので、まず Node が要る。
-- **pnpm を直接入れない理由**: Node 同梱の **corepack** が、`package.json` の `packageManager` 欄に書いた pnpm の版を自動で用意する。だから `brew install pnpm` せず corepack に任せると、将来の自分と版が揃う。
+- **corepack を別に入れる理由**: 以前は corepack が Node に同梱されていたが、**最近の Node（Homebrew 配布の v26 など）は corepack を同梱・PATH 配置しない**。そのため `corepack enable` だけでは `command not found` になる。Homebrew では `brew install corepack` で別途入れる。
+- **pnpm を直接入れず corepack を使う理由**: corepack は `package.json` の `packageManager` 欄に書いた pnpm の版を自動で用意する。だから将来の自分とも版が揃う。
+- **もっと手数を減らしたいなら**: corepack を使わず `brew install pnpm` で pnpm を直接入れてもよい。その場合 `packageManager` 欄によるプロジェクト単位の版固定は効かず、pnpm の版は Homebrew 管理になる（学習用途なら実害は小さい）。
 - **Node の版固定は手動**（セクション4の通り）: Node だけネイティブな版マネージャが無い。複数版を切り替えたくなったら Homebrew で入れ直すか、将来 mise 等の導入を再検討する。
 
 #### プロジェクトを作る
