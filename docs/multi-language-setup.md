@@ -191,12 +191,18 @@ pnpm init
 
 - **`pnpm init`**: `package.json`（依存・スクリプトの台帳）を作る。
 
-作った `package.json` に、版固定の宣言を加える（手で編集）:
+次に **pnpm の版を固定**する。corepack は `package.json` の `packageManager` 欄を読むが、ここは **「厳密に1つの版」しか受け付けない**（`^` や範囲を書くと `Invalid package manager specification ... expected a semver version` で失敗する。`dependencies` の `^` とはルールが違う）。手書きより corepack に書かせるのが安全:
+
+```bash
+corepack use pnpm@latest   # 入っている pnpm を解決し、packageManager 欄を厳密版（＋整合ハッシュ）で書き込む
+```
+
+> ⚠️ **罠**: 新しめの `pnpm init` は `devEngines.packageManager` に `^11.x` のような**範囲**を書く。corepack はこの `^` を拒否するので、上の `corepack use ...` で `packageManager` 欄に直す（または手で `^`/`~` を外す）。最終的に `package.json` はこうなる:
 
 ```jsonc
 {
-  "packageManager": "pnpm@9.0.0",      // 使う pnpm の版を固定（corepack が読む）
-  "engines": { "node": ">=22" }          // 必要な Node の版を宣言
+  "packageManager": "pnpm@11.5.2",   // ← 厳密に1版（^ や範囲は不可。corepack が読む）
+  "engines": { "node": ">=22" }       // 必要な Node の版を宣言
 }
 ```
 
