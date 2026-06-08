@@ -45,7 +45,7 @@
 
 ## 進捗
 
-- [x] **Phase 0**: 環境構築と土台（Git / GitHub / Python環境） — 1週目
+- [x] **Phase 0**: 環境構築と土台（Git / GitHub / 言語環境。多言語対応の器も整備済み） — 1週目
 - [ ] **Phase 1**: ロジックを組む基礎体力（小さなツールの量産） — 1〜2ヶ月目
 - [ ] **Phase 2**: 実務で通用するコード（可読性 / SRP / pytest / 型 / CI） — 2〜3ヶ月目
 - [ ] **Phase 3**: セキュリティ（OWASP Top 10 / Bandit / CodeQL） — 3〜4ヶ月目
@@ -57,32 +57,53 @@
 
 ## ディレクトリ構成
 
+> **構成（器）は多言語対応、学習計画（中身）は1言語集中のまま。** リポジトリは Python / TypeScript / Go / Rust の4言語を置ける「器」にしてあるが、学習は当面1言語（**Python推奨**）に集中し、2言語目は Phase 4 以降に始める（[docs/roadmap.md](docs/roadmap.md) の言語戦略）。器を多言語にする理由・各言語の環境構築手順は [docs/multi-language-setup.md](docs/multi-language-setup.md) を参照。
+
+**配置は3軸 ＝ 言語 / フェーズ / トラック。** 言語をトップに置き（`python/` の中だけが Python の世界…「1言語 = 1ツールチェーンの根」）、その中に **フェーズ**（`phaseN/`＝いつ着手したか）、さらに **トラック**（`basics/`＝ドリル、`log_analyzer/` 等＝ツール）が入る。
+
 ```
 coding-practice/
-├── README.md           # このファイル（全体像と進捗）
-├── pyproject.toml      # 依存・Ruff/mypy設定
-├── .github/workflows/  # ci.yml（Phase 2〜）, codeql.yml（Phase 3〜）
-├── docs/               # ★横断ドキュメント（フェーズに紐づかない）
-│   ├── roadmap.md       # 学習ロードマップ本体
-│   ├── ai-workflow.md   # AIとの役割分担（AIプロダクトオーナー方式）
-│   ├── review-rubric.md # AIレビュアーのレビュー観点
-│   ├── pr-workflow.md   # ブランチ→PR→マージの1サイクル手順
-│   ├── learning-log/    # 週次の学習ログ（YYYY-WW.md）
-│   └── notes/           # 概念メモ（srp.md, sql-injection.md など）
-├── phase1/             # ロジック基礎: 文法ドリル＋自作ツール
-│   ├── basics/          # 文法・小スクリプトのドリル
-│   └── log_analyzer/    # 自作ツール（main.py, tests/, README.md）
-├── phase2/             # 実務品質: リファクタ／テスト演習＋新規ツール
-│   ├── refactoring/     # リファクタ前後をペアで残す
-│   └── testing/         # pytest演習
-└── phase3/             # セキュリティ
-    └── security/        # 脆弱版と修正版をペアで残す（意図的に脆弱なコードを含む）
+├── README.md                # このファイル（全体像と進捗）
+├── docs/                    # ★横断ドキュメント（言語・フェーズに紐づかない）
+│   ├── roadmap.md               # 学習ロードマップ本体
+│   ├── ai-workflow.md           # AIとの役割分担（AIプロダクトオーナー方式）
+│   ├── review-rubric.md         # AIレビュアーのレビュー観点
+│   ├── pr-workflow.md           # ブランチ→PR→マージの1サイクル手順
+│   ├── multi-language-setup.md  # 多言語対応への移行ガイド（環境構築メモ）
+│   ├── learning-log/            # 週次の学習ログ（YYYY-WW.md）
+│   └── notes/                   # 概念メモ（srp.md, sql-injection.md など）
+├── .github/workflows/       # ci.yml（Phase 2〜）/ codeql.yml（Phase 3〜）。言語ごとに job を分ける
+├── .gitignore               # 各言語の生成物（.venv/ node_modules/ target/ dist/）を無視
+│
+├── python/                  # ← Python の世界（ツールチェーンの根）
+│   ├── pyproject.toml           # 依存・Ruff/mypy 設定
+│   ├── .python-version          # 使う Python の版（uv が読む）
+│   ├── uv.lock                  # 依存の固定（再現性）
+│   └── phase1/ …                # basics/（ドリル）＋ log_analyzer/（ツール）…
+│
+├── typescript/              # ← TypeScript の世界（pnpm）
+│   ├── package.json             # 依存・スクリプト（packageManager で pnpm の版を固定）
+│   ├── tsconfig.json            # TypeScript コンパイラ設定
+│   ├── .node-version            # 使う Node の版
+│   ├── pnpm-lock.yaml           # 依存の固定
+│   └── phase1/ …
+│
+├── go/                      # ← Go の世界（modules）
+│   ├── go.mod                   # 依存の台帳（依存を足すと go.sum が増える）
+│   └── phase1/ …
+│
+└── rust/                    # ← Rust の世界（Cargo workspace）
+    ├── Cargo.toml               # workspace（複数 crate を束ねる）
+    ├── rust-toolchain.toml      # 使う Rust の版・道具（clippy / rustfmt）
+    ├── Cargo.lock               # 依存の固定
+    └── phase1/ …                # 1 ドリル/ツール = 1 crate
 ```
 
-> **フォルダ＝フェーズ。ただしツールは「作成フェーズ」に置いて以降は動かさない** — 後フェーズの改修（P2でテスト追加・リファクタ、P3でセキュリティ点検）は、そのファイルを**その場で編集**する（別フェーズへコピー/移動しない）。フェーズ番号＝**着手時期**で、経緯はツール直下 README の履歴＋git＋learning-log が表す。
-> **Phase 0** はフォルダなし（成果物は root 設定と `docs/`）／**Phase 4** は別リポジトリ（成果物リポジトリ）／`docs/` だけはフェーズに属さない横断置き場。
+> **ツールは「作成フェーズ」に置いて以降は動かさない** — 後フェーズの改修（P2でテスト追加・リファクタ、P3でセキュリティ点検）は、そのファイルを**その場で編集**する（別フェーズへコピー/移動しない）。フェーズ番号＝**着手時期**で、経緯はツール直下 README の履歴＋git＋learning-log が表す。
+> **Phase 0** はフェーズ用フォルダなし（成果物は各言語ルートの設定と `docs/`）／**Phase 4** は別リポジトリ（成果物リポジトリ）／`docs/` だけは言語・フェーズに属さない横断置き場。
+> 各言語の宣言/ロックファイル（`pyproject.toml`・`package.json`・`go.mod`・`Cargo.toml` とそれぞれのロック）は**必ずコミット**、生成物（`.venv/`・`node_modules/`・`target/`・`dist/`）は `.gitignore` で**除外**する（再生成できるため）。
 
-**学習リポジトリは Public 推奨**（CodeQL が無料で使える＋公開前提が機密情報管理の練習になる）。Phase 4 では、これとは別に成果物用の **プロジェクトリポジトリを独立して作る**（例: `log-pilot`）。その構成（参考）:
+**学習リポジトリは Public 推奨**（CodeQL が無料で使える＋公開前提が機密情報管理の練習になる）。Phase 4 では、これとは別に成果物用の **プロジェクトリポジトリを独立して作る**（例: `log-pilot`）。その構成（参考。下は Python の例で、選んだ言語に読み替える）:
 
 ```
 log-pilot/
@@ -102,18 +123,27 @@ log-pilot/
 
 1. 作業はブランチ + Pull Request で行い、CI・CodeQLの指摘に対応してから自分でマージする（手順とフロー図: [docs/pr-workflow.md](docs/pr-workflow.md)）
 2. ツール開発はIssue駆動（AIがPO役として発行したチケットをIssueに登録し、仕様の質疑もIssueコメントに残す）
-3. `phase3/security/` 配下のコードは学習目的で**意図的に脆弱**。実環境では使用しないこと
+3. `<言語>/phase3/security/` 配下のコード（例: `python/phase3/security/`）は学習目的で**意図的に脆弱**。実環境では使用しないこと
 4. 週1回 `docs/learning-log/` に「やったこと・学んだこと・次にやること」を記録する
 5. AIが書いたコードを採用した場合は、その旨と自分が検証した内容をコミットメッセージに残す
 
 ## セットアップ
 
+リポジトリを取得:
+
 ```bash
 git clone https://github.com/<username>/coding-practice.git
 cd coding-practice
-# Python環境（uv使用の場合）
-uv sync
 ```
+
+各言語は独立した「世界」。**使う言語のディレクトリに入って**セットアップする（他言語は触らなくてよい）。各ツール（uv / pnpm / go / rustup）の導入と「なぜそうするのか」は [docs/multi-language-setup.md](docs/multi-language-setup.md) を参照。
+
+| 言語 | 作業ディレクトリ | コマンド（その言語のルートで） | 通れば言えること |
+|------|----------------|------------------------------|-----------------|
+| Python | `python/` | `uv sync` → `uv run python main.py` | 依存が再現でき、コードが動く |
+| TypeScript | `typescript/` | `pnpm install` → `pnpm exec tsc --noEmit` | 依存が入り、型チェックが通る |
+| Go | `go/` | `go build ./...` | 全パッケージがビルドできる |
+| Rust | `rust/` | `cargo check` | 全 crate がコンパイルできる |
 
 ## 週次の回し方（15時間の例）
 
