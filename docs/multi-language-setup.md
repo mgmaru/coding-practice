@@ -110,6 +110,8 @@ Python に慣れていると「Go の venv は？Rust の venv は？」と探�
 
 > 実際の作業は **ブランチ上**で行う（`docs/pr-workflow.md` のルール: main に直接コミットしない）。
 
+> **前提（macOS）**: 各言語ステップの先頭に「**インストール（初回のみ）**」を付けた。**そのツールがまだ入っていなければ**実行する（`xxx --version` が表示されれば導入済み＝skip 可）。例は Homebrew を使う。Homebrew 自体が無ければ先に https://brew.sh の手順で入れる（`brew --version` で確認）。
+
 ### ステップ 0: 作業ブランチを切る
 
 ```bash
@@ -122,6 +124,19 @@ git checkout -b chore/multi-language-layout
 ---
 
 ### ステップ 1: Python を `python/` へ引っ越す
+
+#### インストール（初回のみ）: uv
+
+```bash
+brew install uv          # uv（Python のパッケージ/プロジェクト管理ツール）を入れる
+uv --version             # 入ったか確認
+```
+
+- **uv とは**: 依存管理・仮想環境・Python 本体の導入までまとめて行う高速ツール（Rust 製）。`pip` + `venv` + `pyenv` をまとめた立ち位置。
+- **Python 本体は別途入れなくてよい**: uv は `.python-version` を見て、**必要な版の Python を自分で入れてくれる**（`uv python install 3.12` 相当を自動で行う）。だから「Python をどう入れるか」で悩まずに済む。
+- 公式インストーラ派なら: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+#### 引っ越し作業
 
 ```bash
 mkdir python
@@ -152,13 +167,25 @@ uv sync
 
 ### ステップ 2: TypeScript（pnpm）の世界を作る
 
+#### インストール（初回のみ）: Node.js（＋ pnpm）
+
+```bash
+brew install node        # Node.js 本体を入れる（npm と corepack が同梱される）
+node -v                  # 入ったか確認
+corepack enable          # 同梱の corepack を有効化（pnpm の版を自動で揃えられるようになる）
+```
+
+- **なぜ Node を入れるのか**: TypeScript は最終的に JavaScript として **Node.js（JS の実行環境）** の上で動く。pnpm も Node の上で動くので、まず Node が要る。
+- **pnpm を直接入れない理由**: Node 同梱の **corepack** が、`package.json` の `packageManager` 欄に書いた pnpm の版を自動で用意する。だから `brew install pnpm` せず corepack に任せると、将来の自分と版が揃う。
+- **Node の版固定は手動**（セクション4の通り）: Node だけネイティブな版マネージャが無い。複数版を切り替えたくなったら Homebrew で入れ直すか、将来 mise 等の導入を再検討する。
+
+#### プロジェクトを作る
+
 ```bash
 mkdir typescript && cd typescript
-corepack enable
 pnpm init
 ```
 
-- **`corepack enable`**: Node に同梱の「パッケージマネージャ管理ツール」を有効化する。これで `package.json` の `packageManager` 欄に書いた pnpm の版が自動で使われる＝**チーム/将来の自分と pnpm の版を揃えられる**。
 - **`pnpm init`**: `package.json`（依存・スクリプトの台帳）を作る。
 
 作った `package.json` に、版固定の宣言を加える（手で編集）:
@@ -191,6 +218,18 @@ echo "22" > .node-version
 
 ### ステップ 3: Go（modules）の世界を作る
 
+#### インストール（初回のみ）: Go
+
+```bash
+brew install go          # Go 本体（コンパイラ＋go コマンド）を入れる
+go version               # 入ったか確認
+```
+
+- **Go は1つで完結**: `go` コマンドにビルド・テスト・依存管理（modules）が全部入っている。別途パッケージマネージャを入れる必要が無い。
+- 公式 pkg 派なら: https://go.dev/dl から macOS 用インストーラを入れる。
+
+#### モジュールを作る
+
 ```bash
 mkdir go && cd go
 go mod init github.com/<github-username>/coding-practice/go
@@ -213,6 +252,20 @@ go build ./...   # go/ 以下の全パッケージをビルド（... は再帰�
 ---
 
 ### ステップ 4: Rust（Cargo workspace）の世界を作る
+
+#### インストール（初回のみ）: Rust（rustup 経由）
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # rustup を入れる（画面の指示に従う／既定で可）
+source "$HOME/.cargo/env"                                        # 今のシェルに PATH を通す（新しいシェルでは不要）
+rustc --version && cargo --version                               # 入ったか確認
+```
+
+- **なぜ Homebrew でなく rustup か**: Rust は **rustup**（ツールチェーン管理ツール）経由で入れるのが公式推奨。`rust-toolchain.toml`（版固定）を読んでプロジェクトごとに適切な版・コンポーネント（clippy/rustfmt）へ自動で切り替えるのは rustup の役割だから。
+- **入るもの**: `rustc`（コンパイラ）/ `cargo`（ビルド＋パッケージ管理）/ `rustup`（版管理）一式。
+- brew 派なら `brew install rustup` 後に `rustup-init` でも可。
+
+#### ワークスペースを作る
 
 ```bash
 mkdir rust && cd rust
@@ -304,5 +357,7 @@ python/.venv/
 | crate（Rust） | Rust のパッケージ1個（ライブラリ or 実行ファイル） |
 | workspace（Rust） | 複数 crate を束ねて1か所で管理する仕組み |
 | corepack | Node 同梱の、パッケージマネージャ（pnpm 等）の版を揃える仕組み |
+| rustup | Rust のツールチェーン（コンパイラ・cargo・clippy 等）を管理・切替する公式ツール |
+| Homebrew | macOS のパッケージ管理ツール（`brew`）。各言語のツール導入に使う |
 | devDependencies | 開発時だけ必要で成果物には同梱しない依存（`pnpm add -D`） |
 | `./...`（Go） | 「このディレクトリ以下の全パッケージ」を表す指定 |
