@@ -6,10 +6,14 @@ on:
     branches: [main]
     paths:
       - "typescript/**"
+      - "!typescript/**/*.md" # ドキュメント(*.md)だけの変更ではCIを起動しない
+      - "!typescript/**/*.txt" # txt系も同様（README/サンプル等のドキュメント扱い）
       - ".github/workflows/typescript-ci.yml"
   pull_request:
     paths:
       - "typescript/**"
+      - "!typescript/**/*.md"
+      - "!typescript/**/*.txt"
       - ".github/workflows/typescript-ci.yml"
 
 permissions:
