@@ -37,3 +37,15 @@
     - その中でも、`corepack`を使用して管理することで、`package.json`に`packageManager`というフィールドを設定するだけで、`pnpm`のバージョンを固定できるので、便利だと思った。
     - ただし、`packageManager`では、`pnpm`のバージョンを指定する必要がある。`^`などの範囲指定は不可。
 ---------------
+### 2026-06-09
+#### やったこと
+- 言語別に(format/lint/型)チェックのGitHub Actionsを追加
+- コードレビュー用のSkillを作成
+#### 気づき
+- 言語別に(format/lint/型)チェックのGitHub Actionsを追加
+    - 言語別にディレクトリを作成しているので、管理しやすいように言語別にCIファイルを分けた。
+    - PythonのCIファイル
+        - `ruff`（Linter）と`myoy`(型チェック)が、pyproject.tomlの依存関係に入っていない場合、`uvx`で簡易的に実行するようにした（ただし、再現性を出したいのであれば、`uv`の方が良いかも）。
+    - CIファイルの中の`python-version`や、`ruff`、`mypy`のバージョンを固定した方が良い。
+    - 依存関係が増えた時は、`uv sync --locked`にした方が良さそう。
+- CIファイル変更時の構文チェックのために、`actionlint`を導入した。
