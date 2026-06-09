@@ -1,6 +1,6 @@
 ---
 name: rubric-review
-description: Review the user's own code changes against THIS repository's rubric (docs/review-rubric.md), selecting criteria by Phase × Track. Returns findings as must/should/nice with reasons, written in Japanese. Skips layer-0 concerns (format/lint/type/SAST/deps) that tools already cover. Use when the user asks to review their implementation in this learning repo (drills or tools/projects) before merging — e.g. "/rubric-review", "rubric でレビューして", "Phase2 のツールをレビューして".
+description: Reviews the user's own code changes against THIS repository's rubric (docs/review-rubric.md), selecting criteria by Phase × Track. Returns findings as must/should/nice with reasons, written in Japanese. Skips layer-0 concerns (format/lint/type/SAST/deps) that tools already cover. Use when the user asks to review their implementation in this learning repo (drills or tools/projects) before merging — e.g. "/rubric-review", "rubric でレビューして", "Phase2 のツールをレビューして".
 disable-model-invocation: true
 argument-hint: "[phase] [track]"
 arguments: [phase, track]
@@ -11,9 +11,10 @@ arguments: [phase, track]
 Review the user's code against the repository's own rubric in `docs/review-rubric.md`.
 
 This skill is the **procedure**. `docs/review-rubric.md` is the **content and the single
-source of truth**. Never hardcode or paraphrase the criteria here — always read the rubric
-at run time so that edits to the rubric take effect automatically (no drift between this
-skill and the doc).
+source of truth**. The rubric is **injected live at the end of this skill** (see the
+"Rubric" section) via `cat docs/review-rubric.md`, so it is the live file — never a copy.
+Never hardcode, copy, or paraphrase the criteria; editing the doc updates this skill
+automatically (no drift).
 
 ## 0. Output language (read first — non-negotiable)
 
@@ -47,12 +48,16 @@ Resolve both, in this order:
 
 State the resolved **Phase** and **Track** at the top of the review so the user can correct you.
 
-## 3. Read the rubric and select criteria
+## 3. Select criteria from the rubric
 
-1. Read `docs/review-rubric.md`.
-2. Use its **適用マトリクス (Phase × Track)** to pick which groups to apply.
-   - Shape reminder (the rubric file is authoritative): tools are a *superset* of drills —
-     drills ≈ ①②; tools add ③ and 層2 from Phase 1; ④ unlocks at Phase 2; ⑤ at Phase 3.
+The full rubric is inlined in the **"Rubric"** section at the end of this skill (live from
+`docs/review-rubric.md`). If for some reason it is not present — e.g. the session was not
+started from the repo root, so the injection produced nothing — Read `docs/review-rubric.md`
+directly before continuing.
+
+1. Use the rubric's **適用マトリクス (Phase × Track)** to pick which groups to apply.
+2. Shape reminder (the rubric is authoritative): tools are a *superset* of drills —
+   drills ≈ ①②; tools add ③ and 層2 from Phase 1; ④ unlocks at Phase 2; ⑤ at Phase 3.
 3. Apply **only** the selected groups. Applying more — e.g. demanding ④ tests in Phase 1, or
    ⑤ security before Phase 3 — is a *defect* of the review, not thoroughness.
 
@@ -85,3 +90,10 @@ Group findings by 重大度 (must → should → nice). Then end with:
   「なぜこの関数分割にしたか自分の言葉で説明できるか」). The final judgment is theirs (層2).
 
 Keep it focused: a few high-signal findings beat an exhaustive list.
+
+## Rubric (live single source of truth — injected at load time)
+
+The following is inlined from `docs/review-rubric.md` at skill-load time. This is the live
+file, not a copy; do not paraphrase or duplicate it elsewhere. Apply its 適用マトリクス per §2–§3.
+
+!`cat docs/review-rubric.md`
