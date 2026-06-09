@@ -1,0 +1,53 @@
+name: typescript-ci
+
+# typescript/ 配下を変更した push のときだけ走る。
+on:
+  push:
+    paths:
+      - "typescript/**"
+      - ".github/workflows/typescript-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2 # typescript/package.json の packageManager と合わせる
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      # 層0: フォーマット(prettier) / 型(tsc)。
+      # .ts/.tsx がまだ無い間はスキップする:
+      #   - tsc は入力ゼロだと TS18003 で失敗する
+      #   - prettier を `.` 全体にかけると tsconfig.json(コメント付き) や pnpm-lock.yaml を誤検出する
+      # → 追跡中の .ts/.tsx だけを対象にする。
+      - name: Prettier & type check
+        run: |
+          ts_files=$(git ls-files '*.ts' '*.tsx')
+          if [ -z "$ts_files" ]; then
+            echo ".ts/.tsx がまだ無いためスキップ（TS コード追加後に走ります）"
+            exit 0
+          fi
+          pnpm exec prettier --check $ts_files
+          pnpm exec tsc --noEmit
+
+      # 層0: lint(ESLint) は eslint.config.js（flat config）と typescript-eslint を
+      # 入れてから有効化する。TS コードを書き始めるタイミングで下記を有効化:
+      # - name: ESLint
+      #   run: pnpm exec eslint .

@@ -1,0 +1,41 @@
+name: go-ci
+
+# go/ 配下を変更した push のときだけ走る。
+on:
+  push:
+    paths:
+      - "go/**"
+      - ".github/workflows/go-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod # 使う Go の版は go.mod から読む
+
+      # 層0: フォーマット。gofmt が整形漏れを列挙したら失敗させる（gofmt/vet は Go 組込みで追加導入不要）。
+      - name: gofmt check
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt が必要なファイル:"; echo "$unformatted"; exit 1
+          fi
+
+      # 層0: lint（go vet）。.go がまだ無いと "no packages to vet" で失敗するのでガードする。
+      - name: go vet
+        run: |
+          if [ -n "$(git ls-files '*.go')" ]; then
+            go vet ./...
+          else
+            echo ".go ファイルがまだ無いため go vet をスキップ（Go コード追加後に走ります）"
+          fi
