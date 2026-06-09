@@ -1,8 +1,13 @@
 name: typescript-ci
 
-# typescript/ 配下を変更した push のときだけ走る。
+# typescript/ 配下を変更した PR と main への push で走る。
 on:
   push:
+    branches: [main]
+    paths:
+      - "typescript/**"
+      - ".github/workflows/typescript-ci.yml"
+  pull_request:
     paths:
       - "typescript/**"
       - ".github/workflows/typescript-ci.yml"

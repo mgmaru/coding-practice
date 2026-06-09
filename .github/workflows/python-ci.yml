@@ -1,12 +1,16 @@
 name: python-ci
 
-# 層0（フォーマット / lint / 型）を push 時にチェックする。
-# python/ 配下を変更した push のときだけ走る（言語ごとに 1 ファイル）。
+# 層0（フォーマット / lint / 型）を PR と main への push で実行する（言語ごとに 1 ファイル）。
 on:
   push:
+    branches: [main] # マージ後の main を守る
     paths:
       - "python/**"
       - ".github/workflows/python-ci.yml" # このワークフロー自身の変更でも走らせる
+  pull_request:
+    paths:
+      - "python/**"
+      - ".github/workflows/python-ci.yml"
 
 permissions:
   contents: read
@@ -26,14 +30,17 @@ jobs:
         with:
           enable-cache: true
 
-      # ruff / mypy は uvx で実行（pyproject に入れていなくても動く）。
-      # ローカルでも同じ `uvx ruff ...` / `uvx mypy .` を実行すれば結果が一致する。
-      # バージョンを固定したい場合は `uvx ruff@<ver>` のように指定する。
+      # Python の版は python/.python-version（3.12）が単一正本。uv が読み取り、無ければ自動DLする。
+      # ruff / mypy は dev 依存として uv.lock で固定済み。--locked で lock とのズレも検出する。
+      - name: Install (locked)
+        run: uv sync --locked
+
+      # ローカルでも同じ `uv run ruff ... / uv run mypy .` を実行すれば結果が一致する。
       - name: Ruff format check
-        run: uvx ruff format --check . # CI では書き換えず、整形ズレがあれば失敗
+        run: uv run ruff format --check . # CI では書き換えず、整形ズレがあれば失敗
 
       - name: Ruff lint
-        run: uvx ruff check .
+        run: uv run ruff check .
 
       - name: mypy (type check)
-        run: uvx mypy .
+        run: uv run mypy .

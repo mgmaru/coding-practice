@@ -1,8 +1,13 @@
 name: rust-ci
 
-# rust/ 配下を変更した push のときだけ走る。
+# rust/ 配下を変更した PR と main への push で走る。
 on:
   push:
+    branches: [main]
+    paths:
+      - "rust/**"
+      - ".github/workflows/rust-ci.yml"
+  pull_request:
     paths:
       - "rust/**"
       - ".github/workflows/rust-ci.yml"
