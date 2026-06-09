@@ -6,10 +6,16 @@ on:
     branches: [main]
     paths:
       - "go/**"
+      - "!go/**/*.md" # ドキュメント(*.md)だけの変更ではCIを起動しない
+      - "!go/**/*.txt" # txt系も同様（README/サンプル等のドキュメント扱い）
+      - "!go/**/*.log" # ログ/サンプルデータも除外
       - ".github/workflows/go-ci.yml"
   pull_request:
     paths:
       - "go/**"
+      - "!go/**/*.md"
+      - "!go/**/*.txt"
+      - "!go/**/*.log"
       - ".github/workflows/go-ci.yml"
 
 permissions:

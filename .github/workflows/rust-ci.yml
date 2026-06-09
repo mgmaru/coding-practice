@@ -6,10 +6,16 @@ on:
     branches: [main]
     paths:
       - "rust/**"
+      - "!rust/**/*.md" # ドキュメント(*.md)だけの変更ではCIを起動しない
+      - "!rust/**/*.txt" # txt系も同様（README/サンプル等のドキュメント扱い）
+      - "!rust/**/*.log" # ログ/サンプルデータも除外
       - ".github/workflows/rust-ci.yml"
   pull_request:
     paths:
       - "rust/**"
+      - "!rust/**/*.md"
+      - "!rust/**/*.txt"
+      - "!rust/**/*.log"
       - ".github/workflows/rust-ci.yml"
 
 permissions:

@@ -6,10 +6,16 @@ on:
     branches: [main] # マージ後の main を守る
     paths:
       - "python/**"
+      - "!python/**/*.md" # ドキュメント(*.md)だけの変更ではCIを起動しない
+      - "!python/**/*.txt" # txt系も同様（README/サンプル等のドキュメント扱い）
+      - "!python/**/*.log" # ログ/サンプルデータも除外
       - ".github/workflows/python-ci.yml" # このワークフロー自身の変更でも走らせる
   pull_request:
     paths:
       - "python/**"
+      - "!python/**/*.md"
+      - "!python/**/*.txt"
+      - "!python/**/*.log"
       - ".github/workflows/python-ci.yml"
 
 permissions:
