@@ -1,0 +1,33 @@
+name: actionlint
+
+# ワークフロー自体の静的チェック（構文 / スキーマ / 式 / run: の bash を shellcheck）。
+# .github/workflows/ 配下を変更した PR と main への push で走る（他のCIと同じトリガ形）。
+# このファイル自身の変更でも走る＝自己チェックになる。
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Docker は使わず、actionlint 本体（数MB）をバージョン固定でDLするだけ。
+      # shellcheck は ubuntu runner にプリインストール済みなので、run: の bash も自動でチェックされる。
+      - name: Install actionlint (pinned binary)
+        run: |
+          VER=1.7.12
+          curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${VER}/actionlint_${VER}_linux_amd64.tar.gz" \
+            | tar -xz actionlint
+
+      - name: Run actionlint
+        run: ./actionlint -color

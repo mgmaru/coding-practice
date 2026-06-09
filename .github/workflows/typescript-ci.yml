@@ -44,12 +44,13 @@ jobs:
       # → 追跡中の .ts/.tsx だけを対象にする。
       - name: Prettier & type check
         run: |
-          ts_files=$(git ls-files '*.ts' '*.tsx')
-          if [ -z "$ts_files" ]; then
+          # git の出力を配列に読み、各ファイルを正しくクォートして渡す（shellcheck SC2086 を回避）
+          mapfile -t ts_files < <(git ls-files '*.ts' '*.tsx')
+          if [ "${#ts_files[@]}" -eq 0 ]; then
             echo ".ts/.tsx がまだ無いためスキップ（TS コード追加後に走ります）"
             exit 0
           fi
-          pnpm exec prettier --check $ts_files
+          pnpm exec prettier --check "${ts_files[@]}"
           pnpm exec tsc --noEmit
 
       # 層0: lint(ESLint) は eslint.config.js（flat config）と typescript-eslint を
