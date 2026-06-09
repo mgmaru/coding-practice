@@ -75,7 +75,7 @@ coding-practice/
 │   ├── multi-language-setup.md  # 多言語対応への移行ガイド（環境構築メモ）
 │   ├── learning-log/            # 週次の学習ログ（YYYY-WW.md）
 │   └── notes/                   # 概念メモ（srp.md, sql-injection.md など）
-├── .github/workflows/       # ci.yml（Phase 2〜）/ codeql.yml（Phase 3〜）。言語ごとに job を分ける
+├── .github/workflows/       # 言語ごとにCIを分割（python-ci.yml / go-ci.yml / rust-ci.yml / typescript-ci.yml）。codeql.yml は Phase 3〜
 ├── .gitignore               # 各言語の生成物（.venv/ node_modules/ target/ dist/）を無視
 │
 ├── python/                  # ← Python の世界（ツールチェーンの根）

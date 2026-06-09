@@ -1,0 +1,39 @@
+name: python-ci
+
+# 層0（フォーマット / lint / 型）を push 時にチェックする。
+# python/ 配下を変更した push のときだけ走る（言語ごとに 1 ファイル）。
+on:
+  push:
+    paths:
+      - "python/**"
+      - ".github/workflows/python-ci.yml" # このワークフロー自身の変更でも走らせる
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python # pyproject.toml がある場所
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        # setup-uv は移動タグ（@v8 等）を出さないため、SHA で固定する
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+
+      # ruff / mypy は uvx で実行（pyproject に入れていなくても動く）。
+      # ローカルでも同じ `uvx ruff ...` / `uvx mypy .` を実行すれば結果が一致する。
+      # バージョンを固定したい場合は `uvx ruff@<ver>` のように指定する。
+      - name: Ruff format check
+        run: uvx ruff format --check . # CI では書き換えず、整形ズレがあれば失敗
+
+      - name: Ruff lint
+        run: uvx ruff check .
+
+      - name: mypy (type check)
+        run: uvx mypy .
