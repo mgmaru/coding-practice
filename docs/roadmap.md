@@ -143,7 +143,7 @@
   - ローカル: Bandit（Python向けSAST）、Semgrep
   - GitHub: **CodeQL（Code Scanning）をデフォルトセットアップで有効化** → わざと脆弱なPRを出してアラートを確認 → 修正してアラートが消えるのを確認
   - Dependabot（依存パッケージの脆弱性通知）も有効化
-  - **（言語別の読み替え）**: SAST/スキャナは言語で異なる。上記は Python の例。CodeQL は Python・TypeScript・Go に対応するが、**Rust は CodeQL 対応がプレビュー段階**のため、Rust では `cargo-audit`（依存の脆弱性監査）＋ `clippy` を SAST の主役に読み替える。Dependabot 相当（依存の脆弱性通知）はどの言語でも有効化する。
+  - **（言語別の読み替え）**: SAST/スキャナは言語で異なる。**CodeQL は Python・TypeScript・Go・Rust の4言語すべてに対応**（Rust は 2025年10月に GA。旧「プレビュー」記述は解消）。依存の脆弱性監査は言語別ツール（Python: `pip-audit` / TS: `pnpm audit` / Go: `govulncheck` / Rust: `cargo-audit`）＋ Dependabot をどの言語でも有効化する。lint は Rust なら `clippy`。**言語別の対応ツール一覧は [review-rubric.md の層0](./review-rubric.md) を正本とする。**
 - **GitHub Actions入門②**: CodeQLのワークフローYAMLを読み、トリガー条件を理解する
 - 演習環境: OWASP Juice Shop（意図的に脆弱なアプリ）で攻撃側の視点を体験
 - 設計力の接続: 各演習の最後に「ツールでは検出できない設計上の問題はないか（権限、信頼境界）」を自問する → 簡易な脅威モデリングへ
