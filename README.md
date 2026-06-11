@@ -72,6 +72,7 @@ coding-practice/
 │   ├── branch-naming.md         # ブランチ命名規則（type語彙の正本）
 │   ├── issue-writing.md         # Issueの書き方（構造・受け入れ条件）
 │   ├── pr-writing.md            # PRの書き方（タイトル=コミット・本文）
+│   ├── git-history.md           # 過去のコードは消えない（履歴から取り出す手順）
 │   ├── multi-language-setup.md  # 多言語対応への移行ガイド（環境構築メモ）
 │   ├── learning-log/            # 週次の学習ログ（YYYY-WW.md）
 │   └── notes/                   # 概念メモ（srp.md, sql-injection.md など）
