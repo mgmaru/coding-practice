@@ -166,6 +166,11 @@ func displayTopN(commandTop int, sortValidRequests []Count) ([]Count, error) {
 	// 修正：上位N件を格納するスライス
 	topSortValidRequests := make([]Count, 0, len(sortValidRequests))
 
+	// バグ修正：topが0の場合、全件出力になる
+	if commandTop == 0 {
+		return sortValidRequests, nil
+	}
+
 	// 考察点：ここで、Topの数に対して、リクエストが足りない場合のバリデーションを行う必要がある
 	for i := 0; i < commandTop && i < len(sortValidRequests); i++ {
 		topSortValidRequests = append(topSortValidRequests, sortValidRequests[i])
