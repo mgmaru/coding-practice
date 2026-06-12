@@ -225,7 +225,7 @@ for scanner.Scan() {
 
 **震源（出力が集計結果になっていない）を直しきった、いい修正。** 出力が `(key, count)` のランキングになり、`aggregate` + `keyFns` で 3 ブロックの重複も解消。第 2 ソートも安定動作を実測で確認した（`--by path` で `count:7` の `/api/login` と `/api/users` が、キー昇順で login → users と固定。3 回実行とも同一の並び）。stdout に JSON / stderr に警告、の分離もできている。
 
-**残課題は実質 1 件（`--top` 省略時のバグ）のみ。** ここを直せば must/should は全クリア。
+**残課題だった `--top` 省略時のバグも修正完了（再確認済み）。must/should は全クリア。** 残るは任意の磨き込み（🟡細かい点）のみ。
 
 ## 実測ログ（要点）
 
@@ -247,29 +247,30 @@ $ logstat --by xxx sample.log                 # 不正な --by
 コマンドが不正です。            (exit=1) ✓
 ```
 
-## 🔴 残バグ：`--top` 省略（=0）で「全件」にならず空になる
+## 🔴→✅ 残バグ：`--top` 省略（=0）で「全件」にならず空になる → **修正完了**
 
-`--top` の help は「上位N件（**0で全件**）」だが、実際は省略時に `[]` が返る（DoD「`--top` 省略で全件」未達）。
+**状態: 修正済み（2026-06-12 再確認）。**
+
+（修正前の症状）`--top` の help は「上位N件（**0で全件**）」だが、実際は省略時に `[]` が返っていた（DoD「`--top` 省略で全件」未達）。原因は `displayTopN` で `commandTop == 0` のときループ 0 回 → 空スライス。
+
+（対応）`displayTopN` の先頭に `if commandTop == 0 { return sortValidRequests, nil }` を追加し、`0 = 全件`を実装。`for i := 0; i < commandTop && i < len(...)` のガードにより件数超過の指定も全件で安全。
+
+（修正後の実測 ✓）
 
 ```
-$ logstat sample.log          # --top 省略 → 全件のはずが…
-[]
-$ logstat --by ip --json sample.log
-[]
+$ logstat sample.log                       # --top 省略 → 全件 ✓
+[{"key":"200","count":30},{"key":"404","count":5},{"key":"401","count":3},{"key":"500","count":3},{"key":"403","count":2}]
+
+$ logstat --by status --top 3 sample.log   # 上位3件 ✓
+[{"key":"200","count":30},{"key":"404","count":5},{"key":"401","count":3}]
+
+$ logstat --by status --top 100 sample.log # 件数超過 → 全件（落ちない）✓
+[{"key":"200","count":30},{"key":"404","count":5},{"key":"401","count":3},{"key":"500","count":3},{"key":"403","count":2}]
 ```
 
-原因は `displayTopN`（main.go:170）。`commandTop == 0` でループ 0 回 → 空スライス。help の宣言と実装が食い違っている。
+> 補足（任意の磨き込み）: `displayTopN` の `error` 戻り値はもう常に nil。戻り値を `[]Count` だけにし、`make`＋ループの代わりに `return sorted[:n]` でスライスすると、nice 項目「全件コピーの除去」も同時に片付く。今のままでも動作は正しい。
 
-**直し方**（先頭で 0 以下を全件扱い。`error` 戻り値はもう常に nil なので撤去し、`sorted[:n]` でスライス）:
-
-```go
-func displayTopN(commandTop int, sorted []Count) []Count {
-    if commandTop <= 0 || commandTop > len(sorted) {
-        return sorted // 0以下=全件 / 件数より多い指定も全件
-    }
-    return sorted[:commandTop]
-}
-```
+> 仕様メモ（バグではない）: `--by ip` で同数のとき第2ソートは**文字列のキー昇順**なので `192.168.0.10` が `192.168.0.2` より前に来る（`"10" < "2"` の辞書順）。IP を文字列キーとして扱う以上これは正しい安定動作で、DoD「キー名の昇順で安定」を満たす。数値順にしたい場合は別途仕様判断（今回は対象外）。
 
 ## 🟡 細かい点（任意）
 
@@ -289,7 +290,8 @@ func displayTopN(commandTop int, sorted []Count) []Count {
 | 引数を `flag` へ（デフォルト/順不同/int 化） | should | ✅ 順不同も実測確認 |
 | `strings.Fields` の 1 回化 | should | ✅ |
 | フィールド添字のマジックナンバー解消 | nice | ✅（`5` の定数化が残るのみ） |
-| `displayTopN` の全件コピー / `Atoi` | nice | △ コピーは残（→ 残バグ修正と同時に `sorted[:n]` で解消可） |
+| `--top` 省略（=0）で全件 | （DoD/バグ） | ✅ 修正完了・再確認済み |
+| `displayTopN` の全件コピー / `Atoi` | nice | △ コピーは残（任意。`sorted[:n]` で解消可） |
 | 出力が集計結果（層2 問2） | — | ✅ 解決 |
 
-> **残タスクは実質「`--top 0` = 全件のバグ修正」1 本。** ここを直せば must/should 全クリア。
+> **must/should はすべてクリア。** 残るは任意の磨き込み（0件警告の抑制・`5` の定数化・`displayTopN` の `error` 撤去とスライス化・残骸削除）のみ。
