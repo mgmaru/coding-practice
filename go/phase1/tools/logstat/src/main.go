@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -21,50 +21,54 @@ type Request struct {
 
 type Requests []Request
 
-// コマンドを受け取り、解析する関数
-func parseCommand() ([]string, error) {
-
-	var commandIndex string //コマンド
-	var logFilePath string  //ログファイル
-	var by string           //集計軸
-	var top string          //上位N件
-	var json string         //JSON形式
-
-	// コマンド入力受付
-	if _, err := fmt.Scanf("%s %s --by %s --top %s %s", &commandIndex, &logFilePath, &by, &top, &json); err != nil {
-		// 引数の不足を検出した場合
-		return nil, errors.New("引数が不足しています")
-	}
-	// コマンドが不正
-	if commandIndex != "logstat" {
-		return nil, errors.New("コマンドが不正です。")
-	}
-	// コマンドが不正
-	if by != "status" && by != "path" && by != "ip" {
-		return nil, errors.New("コマンドが不正です。")
-	}
-	// コマンド不正（topが数字ではない）
-	if _, err := strconv.Atoi(top); err != nil {
-		return nil, errors.New("コマンドが不正です。")
-	}
-	// コマンド不正
-	if json != "--json" {
-		return nil, errors.New("コマンドが不正です。")
-	}
-	// ログファイルが見つからない場合
-	if !fileExits(logFilePath) {
-		return nil, errors.New("ファイルが存在しません")
-	}
-	// 正しいコマンドの場合、コマンドを返す
-	return []string{commandIndex, logFilePath, by, top, json}, nil
+type Commands struct {
+	CommandIndex string
+	LogFilePath  string
+	By           string
+	Top          int // 修正：flag.Intで指定したため、stringからintへ
+	Json         bool
 }
 
-// ファイルが存在するか判定する関数
-func fileExits(filePath string) bool {
-	if _, err := os.Stat(filePath); err != nil {
-		return false
+// 追加:件数を格納する構造体
+type Count struct {
+	Key   string `json:"key"`
+	Count int    `json:"count"`
+}
+
+// コマンドを受け取り、解析する関数
+func parseCommands() (*Commands, error) {
+
+	// var CommandIndex string
+	// var LogFilePath string
+	// var By string
+	// var Top string
+	// var Json string
+
+	by := flag.String("by", "status", "集計軸 status|path|ip")
+	top := flag.Int("top", 0, "上位N件（0で全件）")
+	asJSON := flag.Bool("json", false, "JSON出力")
+
+	flag.Parse()
+
+	args := flag.Args()
+
+	// ログファイルが指定されていない
+	if len(args) < 1 {
+		return nil, errors.New("ログファイルを指定してください")
 	}
-	return true
+
+	// byコマンドの引数が不正
+	if *by != "status" && *by != "path" && *by != "ip" {
+		return nil, errors.New("コマンドが不正です。")
+	}
+	// 正しいコマンドの場合、コマンドを返す
+	commands := Commands{
+		LogFilePath: args[0],
+		By:          *by,
+		Top:         *top,
+		Json:        *asJSON,
+	}
+	return &commands, nil
 }
 
 // ファイルを開く
@@ -78,151 +82,110 @@ func openFile(filePath string) (*os.File, error) {
 	return file, nil
 }
 
-// ファイルを行単位で読み込んで、有効な行のみを返す関数
-func extractValidRequestLines(file *os.File) ([][]string, error) {
+// ファイルを行単位で読み込んで、有効なリクエストを返す
+func extractValidRequestLines(file *os.File, request Request) (Requests, error) {
 
 	scanner := bufio.NewScanner(file)
 
-	var validRequestLines [][]string
+	var validRequestLines Requests
+	var skipped int
 
 	for scanner.Scan() {
 
 		requestline := scanner.Text()
 
-		// 有効な行かを判断（フィールド数が合わない場合はスキップ）
-		if isValidLine(requestline) {
-			validRequestLine := strings.Fields(requestline)
-			validRequestLines = append(validRequestLines, validRequestLine)
+		// 修正
+		fields := strings.Fields(requestline)
+
+		// 修正
+		// filedsを利用してバリデーション
+		// ただし、ここの"5"がマジックナンバーではないのか。。。
+		if len(fields) != 5 {
+			skipped++
+			// 以下の処理を実行しない
+			continue
 		}
+
+		// 有効なリクエストを構造体にマッピング
+		request.Ip = fields[0]
+		request.Method = fields[1]
+		request.Path = fields[2]
+		request.Status = fields[3]
+		request.Bytes = fields[4]
+
+		validRequestLines = append(validRequestLines, request)
 	}
 
 	if err := scanner.Err(); err != nil {
+		// 本当はファイルクローズの責務はここではない（開いた側の責務）
 		defer file.Close()
 		return nil, err
 	}
 
 	defer file.Close()
+
+	// 修正：不正な行を警告
+	fmt.Fprintf(os.Stderr, "警告: 不正な行を %d 件スキップしました。\n", skipped)
+
 	return validRequestLines, nil
 }
 
-// 有効な行かを判断する関数
-func isValidLine(line string) bool {
-	const VALIDREQUESTLENGTH = 5
-	requestLength := strings.Fields(line)
-	if len(requestLength) == VALIDREQUESTLENGTH {
-		return true
+// 追加:--byで指定されたコマンドの件数を集計して、キーとカウントペアで返す関数
+func aggregate(reqs Requests, keyOf func(Request) string) []Count {
+	m := make(map[string]int)
+	for _, r := range reqs {
+		m[keyOf(r)]++
 	}
-	return false
+	// Countのスライス定義
+	counts := make([]Count, 0, len(m))
+	for k, v := range m {
+		counts = append(counts, Count{Key: k, Count: v})
+	}
+	return counts
 }
 
 // 降順に並べてスライスを返す
-func sortByDescend(commandBy string, validRequests [][]string) [][]string {
+// 修正：[]Countを降順に並べ替える
+// counts: [{Key:"200", Count:15}, {Key:"401", Count:3}, ... ]
+func sortByDescend(counts []Count) []Count {
 
-	m := make(map[string]int)
-
-	// statusのソート
-	if commandBy == "status" {
-		//statusのソート
-		for i := 0; i < len(validRequests); i++ {
-			// 初期カウント
-			count := 1
-			// i番目のスライスの値を抽出
-			status := validRequests[i][3]
-
-			// キーがすでに存在する場合
-			if _, ok := m[status]; ok {
-				m[status] += 1
-			} else {
-				// キーが存在しない場合
-				m[status] = count
-			}
+	sort.Slice(counts, func(i, j int) bool {
+		// 比較対象の件数が違えば降順でソート
+		if counts[i].Count != counts[j].Count {
+			return counts[i].Count > counts[j].Count
 		}
-
-		// キーで配列をソートする
-		sort.Slice(validRequests, func(i, j int) bool { return m[validRequests[i][3]] > m[validRequests[j][3]] })
-	}
-
-	// pathのソート
-	if commandBy == "path" {
-		for i := 0; i < len(validRequests); i++ {
-			// 初期カウント
-			count := 1
-			// i番目のスライスの値を抽出
-			path := validRequests[i][2]
-
-			// キーがすでに存在する場合
-			if _, ok := m[path]; ok {
-				m[path] += 1
-			} else {
-				// キーが存在しない場合
-				m[path] = count
-			}
-		}
-		sort.Slice(validRequests, func(i, j int) bool { return m[validRequests[i][2]] > m[validRequests[j][2]] })
-	}
-
-	// ipのソート
-	if commandBy == "ip" {
-		for i := 0; i < len(validRequests); i++ {
-			// 初期カウント
-			count := 1
-			// i番目のスライスの値を抽出
-			ip := validRequests[i][0]
-
-			// キーがすでに存在する場合
-			if _, ok := m[ip]; ok {
-				m[ip] += 1
-			} else {
-				// キーが存在しない場合
-				m[ip] = count
-			}
-		}
-		sort.Slice(validRequests, func(i, j int) bool { return m[validRequests[i][0]] > m[validRequests[j][0]] })
-	}
-	return validRequests
+		// 比較対象の件数が同数の場合、キーの昇順でソート
+		return counts[i].Key < counts[j].Key
+	})
+	return counts
 }
 
 // Top N件のみ出力
-func displayTopN(commandTop string, sortValidRequests [][]string) [][]string {
+func displayTopN(commandTop int, sortValidRequests []Count) ([]Count, error) {
 
-	commandTopInt, _ := strconv.Atoi(commandTop)
+	// 修正：上位N件を格納するスライス
+	topSortValidRequests := make([]Count, 0, len(sortValidRequests))
 
-	var topSortValidRequests [][]string
-
-	if commandTopInt > len(sortValidRequests) {
-		for i := 0; i < len(sortValidRequests); i++ {
-			topSortValidRequests = append(topSortValidRequests, sortValidRequests[i])
-		}
-		return topSortValidRequests
+	// バグ修正：topが0の場合、全件出力になる
+	if commandTop == 0 {
+		return sortValidRequests, nil
 	}
 
-	for i := 0; i < commandTopInt; i++ {
+	// 考察点：ここで、Topの数に対して、リクエストが足りない場合のバリデーションを行う必要がある
+	for i := 0; i < commandTop && i < len(sortValidRequests); i++ {
 		topSortValidRequests = append(topSortValidRequests, sortValidRequests[i])
-
 	}
-	return topSortValidRequests
+	return topSortValidRequests, nil
 }
 
 // jsonで出力する関数
-func formatJson(topSortValidRequests [][]string) ([]byte, error) {
+func formatJson(topSortValidRequests []Count) ([]byte, error) {
 
-	var requests Requests
-
-	for i := 0; i < len(topSortValidRequests); i++ {
-		request := Request{
-			Ip:     topSortValidRequests[i][0],
-			Method: topSortValidRequests[i][1],
-			Path:   topSortValidRequests[i][2],
-			Status: topSortValidRequests[i][3],
-			Bytes:  topSortValidRequests[i][4],
-		}
-		requests = append(requests, request)
-	}
 	// リクエストをJSONに変換
-	jsonRequests, err := json.Marshal(requests)
+	jsonRequests, err := json.Marshal(topSortValidRequests)
 
 	if err != nil {
-		return nil, errors.New("Jsonに変換できませんでした。")
+		return nil, errors.New("JSONに変換できませんでした。")
 	}
 
 	return jsonRequests, nil
@@ -230,39 +193,53 @@ func formatJson(topSortValidRequests [][]string) ([]byte, error) {
 
 func main() {
 
+	// 初期化（インスタンス作成）
+	var request Request
+
 	// コマンド解析
-	commands, err := parseCommand()
+	commands, err := parseCommands()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
-	logFile := commands[1]
 
 	// ファイル開く
-	file, err := openFile(logFile)
+	file, err := openFile(commands.LogFilePath)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	validRequests, err := extractValidRequestLines(file)
+	// 有効なリクエストを抽出
+	validRequests, err := extractValidRequestLines(file, request)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	// 追加:有効なコマンドをaggregateに渡す
+	keyFns := map[string]func(Request) string{
+		"status": func(r Request) string { return r.Status },
+		"path":   func(r Request) string { return r.Path },
+		"ip":     func(r Request) string { return r.Ip },
+	}
+	counts := aggregate(validRequests, keyFns[commands.By])
+
 	// ソート
-	commandBy := commands[2]
-	sortValidRequests := sortByDescend(commandBy, validRequests)
+	// sortValidRequests := sortByDescend(commands.By, validRequests)
+	sortValidRequests := sortByDescend(counts)
 
 	// 最初のN件
-	commandTop := commands[3]
-	topSortValidRequests := displayTopN(commandTop, sortValidRequests)
+	topSortValidRequests, err := displayTopN(commands.Top, sortValidRequests)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 
 	// JSONに変換
 	jsonRequests, err := formatJson(topSortValidRequests)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
