@@ -1,8 +1,15 @@
 # コードレビュー結果（Issue #25 / logstat）
 
-> 対象: `src/main.go`（2026/06/12 時点）
+> 対象: `src/main.go`
 > 観点: `/rubric-review`（Phase 1 × ツール、観点 ①仕様適合 ②計算量/設計 ③重複/可読性 ＋ 層2の問い）
 > 補足: 「直したか」の進捗は **Issue #25** で、「どう直したか・なぜ」は `notes.md` で管理する。ここは **レビュー所見** を残す。
+>
+> - **1回目レビュー（修正前 / 2026-06-12）**: 以下「1回目レビュー」。
+> - **2回目レビュー（修正後 / 2026-06-12）**: 末尾「2回目レビュー（修正後の確認結果）」を参照。
+
+---
+
+# 1回目レビュー（修正前）
 
 ## 全体評価
 
@@ -206,3 +213,83 @@ for scanner.Scan() {
 | `displayTopN` の全件コピー / `Atoi` | nice | 一部 | should flag（int 化で不要に） |
 
 > 加えて本レビュー独自の最重要指摘: **出力が集計結果になっていない**（Issue には未記載。層2 問2 の核）。
+
+---
+
+# 2回目レビュー（修正後の確認結果）
+
+> 対象: 1回目レビューを受けて修正された `src/main.go`（2026-06-12）
+> 確認方法: `go build` ＋ `sample.log` での実行（出力先・安定性・順不同・デフォルト値を実測）。
+
+## 総評
+
+**震源（出力が集計結果になっていない）を直しきった、いい修正。** 出力が `(key, count)` のランキングになり、`aggregate` + `keyFns` で 3 ブロックの重複も解消。第 2 ソートも安定動作を実測で確認した（`--by path` で `count:7` の `/api/login` と `/api/users` が、キー昇順で login → users と固定。3 回実行とも同一の並び）。stdout に JSON / stderr に警告、の分離もできている。
+
+**残課題は実質 1 件（`--top` 省略時のバグ）のみ。** ここを直せば must/should は全クリア。
+
+## 実測ログ（要点）
+
+```
+$ logstat --by status --top 3 --json sample.log
+警告: 不正な行を 3 件スキップしました。      # ← stderr
+[{"key":"200","count":30},{"key":"404","count":5},{"key":"401","count":3}]   # ← stdout, 件数ランキング ✓
+
+$ logstat --by path --top 3 sample.log        # 3回とも同一 = 第2ソート安定 ✓
+[{"key":"/index.html","count":10},{"key":"/api/login","count":7},{"key":"/api/users","count":7}]
+
+$ logstat --top 2 --by path sample.log        # 順不同（logfileが末尾）でも動く ✓
+[{"key":"/index.html","count":10},{"key":"/api/login","count":7}]
+
+$ logstat                                     # 引数なし
+ログファイルを指定してください   (exit=1) ✓
+
+$ logstat --by xxx sample.log                 # 不正な --by
+コマンドが不正です。            (exit=1) ✓
+```
+
+## 🔴 残バグ：`--top` 省略（=0）で「全件」にならず空になる
+
+`--top` の help は「上位N件（**0で全件**）」だが、実際は省略時に `[]` が返る（DoD「`--top` 省略で全件」未達）。
+
+```
+$ logstat sample.log          # --top 省略 → 全件のはずが…
+[]
+$ logstat --by ip --json sample.log
+[]
+```
+
+原因は `displayTopN`（main.go:170）。`commandTop == 0` でループ 0 回 → 空スライス。help の宣言と実装が食い違っている。
+
+**直し方**（先頭で 0 以下を全件扱い。`error` 戻り値はもう常に nil なので撤去し、`sorted[:n]` でスライス）:
+
+```go
+func displayTopN(commandTop int, sorted []Count) []Count {
+    if commandTop <= 0 || commandTop > len(sorted) {
+        return sorted // 0以下=全件 / 件数より多い指定も全件
+    }
+    return sorted[:commandTop]
+}
+```
+
+## 🟡 細かい点（任意）
+
+- **スキップ 0 件でも警告が出る**（main.go:128）: `警告: 不正な行を 0 件スキップしました。` が毎回出る。`if skipped > 0 { ... }` で囲むと、警告すべき時だけ出る（「警告は必要な時だけ」という設計判断の練習）。
+- **`len(fields) != 5` の `5`（main.go:103）**: notes でも自問していた通り。`const fieldsPerLine = 5` と名付けると「5 が何か」がコード上で説明される（DRY というより*自己文書化*）。
+- **`extractValidRequestLines(file, request Request)` の `request` 引数（main.go:86）**: 外から渡す必要はなく、ループ内ローカル変数で十分。`main` 側の `var request Request`（192行）も不要に。`file.Close()` の責務もコメント自覚どおり「開いた側（main）で `defer`」が筋。
+- **使わなくなった残骸の削除**: `Commands.CommandIndex`（もうセットされない）、コメントアウトの `var` 群（41-45行）、`sortByDescend` 旧呼び出しコメント（224行）。`Request.Method`/`Bytes` は 5 フィールド整合チェックの役目があるので残してよい。
+
+## Issue #25 進捗（2回目レビュー時点）
+
+| 項目 | 区分 | 状態 |
+| --- | --- | --- |
+| `sortByDescend` 3 ブロックの 1 本化（`aggregate` + `keyFns`） | must | ✅ |
+| 同件数時の第 2 ソート（同数でキー昇順） | must | ✅ 安定を実測確認 |
+| エラー出力を stderr へ | must | ✅ |
+| 不正行スキップの件数警告 | should | ✅（0件時の抑制は任意） |
+| 引数を `flag` へ（デフォルト/順不同/int 化） | should | ✅ 順不同も実測確認 |
+| `strings.Fields` の 1 回化 | should | ✅ |
+| フィールド添字のマジックナンバー解消 | nice | ✅（`5` の定数化が残るのみ） |
+| `displayTopN` の全件コピー / `Atoi` | nice | △ コピーは残（→ 残バグ修正と同時に `sorted[:n]` で解消可） |
+| 出力が集計結果（層2 問2） | — | ✅ 解決 |
+
+> **残タスクは実質「`--top 0` = 全件のバグ修正」1 本。** ここを直せば must/should 全クリア。
