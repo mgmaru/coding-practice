@@ -3,9 +3,7 @@ package collections
 // Goには標準のフィルター関数がないらしい...
 // 標準の関数のみで実装する
 
-var input = []int{1, 2, 3, 4, 5, 6}
-
-func filterSquaredEvens([]int) []int {
+func filterSquaredEvens(input []int) []int {
 
 	var squaredEven []int
 
