@@ -3,14 +3,15 @@ package collections
 // Goには標準のフィルター関数がないらしい...
 // 標準の関数のみで実装する
 
-func filterSquaredEvens(input []int) []int {
+func filterSquaredEvens(input []int) ([]int, error) {
 
-	var squaredEven []int
+	// caption!: var squaredEvens []int -> nil slice
+	squaredEvens := []int{}
 
-	for i := range input {
-		if i%2 == 0 {
-			squaredEven = append(squaredEven, i)
+	for _, v := range input {
+		if v%2 == 0 {
+			squaredEvens = append(squaredEvens, v*v)
 		}
 	}
-	return squaredEven
+	return squaredEvens, nil
 }
