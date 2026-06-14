@@ -1,6 +1,7 @@
 package collections
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -15,6 +16,7 @@ func TestFilterSquaredEvens(t *testing.T) {
 		{"normal", []int{1, 2, 3, 4, 5, 6}, []int{4, 16, 36}, nil},
 		{"noneEvens", []int{3, 5, 7}, []int{}, nil},
 		{"emptyValue", []int{}, []int{}, nil},
+		{"input nil", nil, nil, ErrNilInput},
 	}
 
 	for _, c := range cases {
@@ -27,7 +29,9 @@ func TestFilterSquaredEvens(t *testing.T) {
 				t.Errorf("値が違います。")
 			}
 			// エラーが違う場合
-			if gotError != c.WantError {
+			// 修正：「!=」での比較から、「error.Is」の比較へ
+			// 「==」での比較だとポインタで返された場合に比較できない。
+			if !errors.Is(gotError, c.WantError) {
 				t.Errorf("エラーが違います。")
 			}
 		})
