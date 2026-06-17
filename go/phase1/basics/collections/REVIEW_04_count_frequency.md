@@ -126,23 +126,32 @@ type CountElement struct {
 
 ## 修正チェックリスト（`04_count_frequency`）
 
-### 実装 `04_count_frequency.go`
-- [ ] 順序が `map` 走査ではなく `sort` の**全順序**で確定していることを説明できる（観点1）
-- [ ] ソートキーにタイが残らない（count 同数でも element で割れる／element は map キーで一意）（観点1）
-- [ ] 早期 return `if len(input) == 0` を**残す／消す**を決めた（消すなら動作不変を確認）（観点2）
-- [ ] `CountElement` のフィールドを**公開する／パッケージ内に閉じる**を決めた（観点3）
-- [ ] （②nice）`make(map[string]int, len(input))` で map 容量を先取り（観点4）
+> このリストは **2 種類**ある。混ぜると「どこを直すのか分からない」状態になるので、**A=コードを変える** と **B=理解の確認だけ（コードは変えない）** に分けた。
+> まず A を上から潰す。B は手を動かす項目ではなく、「自分の言葉で説明できるか」の確認。
 
-### テスト `04_count_frequency_test.go`
-- [ ] 空・nil 入力の `want` が実装の返し方（非 nil `[]CountElement{}`）に揃っている（観点2）✓ 既に一致
-- [ ] 同数タイのキー昇順を踏むケースがある（`countDuplicated`）✓ 既にある
-- [ ] ケース名タイポ `nomal` → `normal`（観点4）
-- [ ]（任意）単一要素・大文字小文字のケースを追加（観点4）
+### A. コードを直す（ここだけ手を動かす）
 
-### 動作確認
-- [x] `go test -run TestCountElements -count=5 ./phase1/basics/collections` が **5 回連続で緑**
+| やる | 場所 | 何をするか | 必須度 |
+|---|---|---|---|
+| [ ] | `04_count_frequency.go:21-23` | 早期 return `if len(input) == 0 { return []CountElement{} }` を**消す**（消しても結果は同じ。観点2） | 任意（消すと素直） |
+| [ ] | `04_count_frequency.go:14-17` | `CountElement` のフィールドを**公開**（`Element`/`Count`）にする or `CountElements` を小文字に閉じる（観点3） | **要・二択を決める** |
+| [ ] | `04_count_frequency.go:25` | `make(map[string]int, 0)` の `, 0` を消す or `len(input)` にする（観点4） | 任意（②nice） |
+| [ ] | `04_count_frequency_test.go:14` | ケース名タイポ `"nomal"` → `"normal"`（観点4） | 任意 |
+| [ ] | `04_count_frequency_test.go` | 単一要素・大文字小文字のケースを追加（観点4） | 任意 |
+
+> 観点3 でフィールドを公開に変えたら、**テスト側 `04_count_frequency_test.go:14-17` の `element:`/`count:` も `Element:`/`Count:` に直す**（同じパッケージだが揃える）。
+
+### B. 理解の確認だけ（コードは変えない・直す場所は無い）
+
+- [ ] **観点1**: なぜこのコードは `03` のようにフレーキーにならないのか、一文で言えるか。
+  → 「`map` 走査の並びは不定だが、直後の `sort.Slice` が `(count 降順, element 昇順)` の**全順序**で並びを確定する。element は map キーで一意なのでタイが残らず、出力は決定的」。**これが言えれば観点1は完了。直す行は無い。**
+- [ ] **観点2（確認側）**: 空・nil 入力の `want` が実装の返し方（非 nil `[]CountElement{}`）に揃っている → **既に一致**。変更不要。
+- [ ] **観点2（確認側）**: 早期 return を消す場合、消しても `go test` が緑のままなことを確認した（動作不変の裏取り）。
+
+### 動作確認（直したあと回す）
+- [x] `go test -run TestCountElements -count=5 ./phase1/basics/collections` が **5 回連続で緑**（修正前時点で確認済み）
 - [x] `gofmt` 差分なし・`go vet` クリーン
-- [ ] `[no tests to run]` が出ていない（`-run` の名前確認）
+- [ ] 修正後にもう一度上記を回して緑／`[no tests to run]` が出ていない
 
 ---
 
