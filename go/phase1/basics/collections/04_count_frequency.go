@@ -19,11 +19,8 @@ type CountElement struct {
 
 func CountElements(input []string) []CountElement {
 
-	// 修正：inputが空スライスおよびnilスライスの場合のガードは意図的に残している。
-	// 理由：今後、この関数を自分以外の開発者が回収するときに、<var 変数　型>で宣言してしまった時の保険として残しておく。
-	if len(input) == 0 {
-		return []CountElement{}
-	}
+	// 修正：inputが空スライスおよびnilスライスの場合のガードは削除した。
+	// 理由：makeでスライスは初期化しているために、入力がnilであっても、全て空配列で返る。
 
 	// 修正：長さ（容量）を指定
 	m := make(map[string]int, len(input))
