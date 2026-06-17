@@ -83,3 +83,35 @@
 #### 実装時間
 - 約3時間
 ---
+### 2026/6/17
+#### やったこと
+- `04_count_frequency.go` 実装
+- `04_count_frequency_test.go` 実装
+#### わかったこと
+- 入力`["apple", "banana", "apple", "cherry", "banana", "apple"]`に対して、出力`{"apple": 3, "banana": 2, "cherry": 1}`が出力されるには、順序を気にする必要がある。
+    - `map`はハッシュ順に格納される（実質ランダム）なので、例えば、以下のような実装だと、順番が保証されない。
+```go
+func CountElements(input []string) map[string]int {
+
+	m := make(map[string]int, 0)
+
+	for _, v := range input {
+		m[v]++ // 順番が保証されない。
+	}
+	return m
+}
+```
+- ただし、**Goでは出力が`map`のデータ構造かつその順序を保証することはできない。**
+    - なので、今回は、`[{element:"apple", count:3}, {element:"banana", count:2}, ...]`のような出力とした。
+    - **仕様を決めることが大事。**
+- `make`は、スライスとmap、チャネルで指定の仕方が違う。
+    - スライス：`make([]T, len, cap)` / `len` ：初期サイズ、　`cap`：容量
+    - map：`make(map[K]V, sizeHint)`/ `sizeHint`：容量
+    - チャネル：`make(chan T, buffer)`/ `buffer`：容量
+- **文字コード(ASCII/Unicodeの数値)の大小**：
+    - 大文字`A-Z`：65〜90
+    - 小文字`a-z`：97〜122
+    - 例えば、`["apple", "Apple", "banana"]`を昇順にソート　→ `["Apple", "apple", "banana"]`になる。
+#### 実装時間
+- 2時間54分
+---
