@@ -1,9 +1,10 @@
 name: rust-ci
 
-# rust/ 配下を変更した PR と main への push で走る。
+# rust/ 配下を変更した PR と、全ブランチへの push で走る。
+# （feature ブランチへの push でも CI を回せるよう branches 限定を外している。
+#   main へのマージ push もこの push トリガで検査される。）
 on:
   push:
-    branches: [main]
     paths:
       - "rust/**"
       - "!rust/**/*.md" # ドキュメント(*.md)だけの変更ではCIを起動しない
@@ -20,6 +21,11 @@ on:
 
 permissions:
   contents: read
+
+# 同一ブランチで連続 push したとき、古い実行を打ち切って最新だけ走らせる。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:

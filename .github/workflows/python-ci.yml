@@ -1,9 +1,10 @@
 name: python-ci
 
-# 層0（フォーマット / lint / 型）を PR と main への push で実行する（言語ごとに 1 ファイル）。
+# 層0（フォーマット / lint / 型）を PR と、全ブランチへの push で実行する（言語ごとに 1 ファイル）。
+# （feature ブランチへの push でも CI を回せるよう branches 限定を外している。
+#   main へのマージ push もこの push トリガで検査される。）
 on:
   push:
-    branches: [main] # マージ後の main を守る
     paths:
       - "python/**"
       - "!python/**/*.md" # ドキュメント(*.md)だけの変更ではCIを起動しない
@@ -20,6 +21,11 @@ on:
 
 permissions:
   contents: read
+
+# 同一ブランチで連続 push したとき、古い実行を打ち切って最新だけ走らせる。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
