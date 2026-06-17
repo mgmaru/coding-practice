@@ -112,4 +112,6 @@ func CountElements(input []string) map[string]int {
     - 大文字`A-Z`：65〜90
     - 小文字`a-z`：97〜122
     - 例えば、`["apple", "Apple", "banana"]`を昇順にソート　→ `["Apple", "apple", "banana"]`になる。
+#### 実装時間
+- 2時間54分
 ---
