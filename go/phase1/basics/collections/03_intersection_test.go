@@ -18,13 +18,13 @@ var Cases = []Case{
 	{"IntSliceAndAisLonger", []any{1, 2, 3, 4, 5}, []any{2, 4, 6}, []any{2, 4}},
 	{"IntSliceAndBisLonger", []any{2, 4, 6}, []any{1, 2, 3, 4, 5}, []any{2, 4}},
 	{"StringSliceAndAisLonger", []any{"apple", "banana", "grape", "lemon"}, []any{"grape"}, []any{"grape"}},
-	{"StringSlicendBisLonger", []any{"grape"}, []any{"apple", "banana", "grape", "lemon"}, []any{"grape"}},
+	{"StringSliceAndBisLonger", []any{"grape"}, []any{"apple", "banana", "grape", "lemon"}, []any{"grape"}},
 	{"AnySlice", []any{1, "apple", 2, "lemon"}, []any{2, "lemon", 4, "banana"}, []any{2, "lemon"}},
 	{"AisEmptySlice", []any{}, []any{2, 4, 6}, []any{}},
 	{"BisEmptySlice", []any{1, 2, 3, 4, 5}, []any{}, []any{}},
 	{"AisNilSlice", nil, []any{2, 4, 6}, []any{}},
 	{"BisNilSlice", []any{1, 2, 3, 4, 5}, nil, []any{}},
-	{"notIcluded", []any{1, 2, 3, 4, 5}, []any{6, 7, 8}, []any{}},
+	{"notIncluded", []any{1, 2, 3, 4, 5}, []any{6, 7, 8}, []any{}},
 	// 修正（観点２）：inputAおよびinputBに重複する要素が含まれている場合のテストケースを追加
 	{"DupInA", []any{2, 2, 1, 3, 4}, []any{2}, []any{2}}, // 修正：重複要素は比較対象から外す（線形探索、set探索ともに）　-> 重複は許さない仕様とする
 	{"DupInB", []any{2}, []any{2, 2, 1, 3, 4}, []any{2}}, // 修正：重複要素は比較対象から外す（線形探索、set探索ともに）　-> 重複は許さない仕様とする

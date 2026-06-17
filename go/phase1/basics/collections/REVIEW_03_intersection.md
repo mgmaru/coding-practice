@@ -131,22 +131,21 @@ func Intersection[T comparable](a, b []T) []T { ... }
 ## 修正チェックリスト（`03_intersection`）
 
 ### テスト `03_intersection_test.go`
-- [ ] **`TestSetSearchElements` が `setSearchElements` を呼ぶ**（観点1・最優先）
-- [ ] 直後に `setSearchElements` をわざと壊して**赤くなる**ことを確認 → 戻す
-- [ ] 重複ケース `DupInA` / `DupInB` を追加（観点5）
-- [ ] 順序が割れる `OrderDiff` を追加（観点3）
-- [ ] 追加ケースの `Want` が**決めた契約どおり**（集合契約なら両実装で同値）
+- [x] **`TestSetSearchElements` が `setSearchElements` を呼ぶ**（観点1・最優先）
+- [x] 重複ケース `DupInA` / `DupInB` を追加（観点5）
+- [x] 順序が割れる `Orderdiff` を追加（観点3）
+- [x] 追加ケースの `Want` が**決めた契約どおり**（`Orderdiff` は B 順の `[2,4]`）
 
 ### 実装 `03_intersection.go`
-- [ ] intersection の契約を一文で決めた（**集合的=ユニーク** / **重複保持**）（観点2）
-- [ ] 2 実装がその契約で**同じ答え**を返す（線形の二重ループを契約に合わせて修正 or 両方デデュープ）
-- [ ] 結果の**順序の契約**を決め、テストで固定した（観点3）
-- [ ] `any` の代償（comparable でない要素で panic）を一文で説明できる（観点4）
-- [ ] （任意 / ②nice）`make([]any, 0, len(inputB))` で容量先取り
+- [x] intersection の契約を一文で決めた（**重複保持しない＝デデュープ**）（観点2）
+- [x] 2 実装がその契約で**同じ答え**を返す（両方デデュープ＋B 順で決定的）
+- [x] 結果の**順序の契約**を決め、テストで固定した（B の出現順）（観点3）
+- [x] `any` の代償（comparable でない要素で panic）を一文で説明できる（観点4）
+- [x] （②nice）`make([]any, 0, len(inputB))` で容量先取り
 
 ### 動作確認
-- [ ] `go test -run SearchElements ./phase1/basics/collections -v` で **両 Test 関数**のサブテストが緑
-- [ ] `[no tests to run]` が出ていない
+- [x] `go test -run SearchElements -count=5 ./phase1/basics/collections` が **5 回連続で緑**（PASS 140 件）
+- [x] `[no tests to run]` が出ていない / `gofmt`・`go vet` クリーン
 
 ---
 
@@ -274,15 +273,61 @@ func deleteDuplicateElements(input []any) []any {
 ## 修正チェックリスト（観点7 追補）
 
 ### 実装 `03_intersection.go`
-- [ ] `deleteDuplicateElements` を **入力順保持**に変更（`map` は存在判定のみ、`append` は入力順）
-- [ ] 両関数の結果順が「B の出現順」で**決定的**になっている
+- [x] `deleteDuplicateElements` を **入力順保持**に変更（`map` は存在判定のみ、`append` は入力順）
+- [x] 両関数の結果順が「B の出現順」で**決定的**になっている
 
 ### 動作確認（フレーキー対策）
-- [ ] `go test -run SearchElements -count=5 ./phase1/basics/collections` が **5 回連続で緑**
-- [ ] 1 回だけの緑で「直った」と判断していない
+- [x] `go test -run SearchElements -count=5 ./phase1/basics/collections` が **5 回連続で緑**
+- [x] 1 回だけの緑で「直った」と判断していない（`-count=1` を 10 回回して全 `ok` も確認）
 
 ### 再レビュー前の自問（観点7）
 1. `map` を走査して作ったスライスの並びは保証されるか？（→ されない）
 2. 「順序を問う／問わない」を決めたか。テストの比較方法（`DeepEqual` か、ソート/集合比較か）はその契約と**同じ向き**か。
 3. その修正は**コードに入っているか**（コメントだけになっていないか）。`git diff` で実体を見たか。
 4. フレーキーを**反復実行で**潰したか（1 回の緑を信じていないか）。
+
+---
+
+# 決着の記録 — 安定緑まで到達
+
+最終形の `deleteDuplicateElements`（コミット時点）:
+
+```go
+func deleteDuplicateElements(input []any) []any {
+	noIncludeDuplicatedElements := make([]any, 0, len(input))
+	m := make(map[any]struct{}, 0)
+	for _, e := range input {
+		if _, ok := m[e]; !ok {        // map は「既出か」の判定だけ
+			m[e] = struct{}{}
+			noIncludeDuplicatedElements = append(noIncludeDuplicatedElements, e) // append は入力順
+		}
+	}
+	return noIncludeDuplicatedElements
+}
+```
+
+- `map` 走査をやめ、**入力スライス順を保ったデデュープ**に変更 → 両関数の出力が「B の出現順」で決定的に。
+- 結果: `go test -count=5` で **PASS 140 件・FAIL 0**、`-count=1` を 10 回連続で全 `ok`。**フレーキー撲滅**。
+- `gofmt` 差分なし・`go vet` クリーン。途中にあった `else { continue }`（無意味な分岐）も除去済み。
+
+## 全観点の最終ステータス
+
+| 観点 | 内容 | 状態 |
+|---|---|---|
+| 1 | set 探索がテストされる（呼び間違い） | ✅ |
+| 2 | 重複の契約＝デデュープで統一、2 実装が一致 | ✅ |
+| 3 | 順序の契約＝「B の出現順」で決定的・テストで固定 | ✅ |
+| 4 | `any` の代償（非 comparable で panic）を理解 | ✅（設計意思として明記） |
+| 5 | 重複・順序のテストケース追加 | ✅ |
+| 6 | フィールド命名統一 | ✅ |
+| 7 | **map 順不同によるフレーキー撲滅**（本ドリル最大の山場） | ✅ |
+
+## 残タスク（任意・動作に無関係）
+
+- コメントのタイポ: `:11`「複数福間荒れ」→「複数含まれ」、`linearSearch` の「containingElements の中に…スキップ」コメント（実体のないロジック説明）の整理。
+- ケース名 `notIcluded` → `notIncluded`、`StringSlicend` → `StringSliceAnd`。
+- `make(map[any]struct{}, 0)` の `, 0` は無害（省略 or `len` でもよい）。
+
+> 総括: 1 個のバグではなく**観点が連鎖する**問題だった。`go test` の表情が
+> **「緑の嘘（呼び間違い）→ 赤の嘘（仕様矛盾）→ たまに緑（フレーキー）→ 安定緑」**と 4 段階で変わり、
+> 各段階で**違う読み方**を要求してきた。`map`×`reflect.DeepEqual`×フレーキーの三点を一通り踏み抜けたのが本ドリルの収穫。

@@ -13,6 +13,7 @@ package collections
 // 修正（観点２）：スライスの重複要素を削除する汎用関数を追加 / 計算量 O(2n) -> O(n)
 // 実装工夫：map[要素]空のstructで抜き出してあげて、その要素を新しいスライスにappendして重複しないスライスを作成する（mapのキーが重複しないことを利用）。
 // 補足：deleteDuplicatedElementsについてはテストは実施しない（今回の課題の趣旨とは離れる）。
+
 func deleteDuplicateElements(input []any) []any {
 
 	// 重複する要素を除いたスライス, 最大容量：len(input)
@@ -21,16 +22,16 @@ func deleteDuplicateElements(input []any) []any {
 	// 要素と空のstructを持つmapを定義
 	m := make(map[any]struct{}, 0)
 
-	// 要素を格納（要素の存在だけ格納） -> 計算量：O(n)
+	// バグ修正：
 	for _, e := range input {
-		m[e] = struct{}{}
+		// もし、要素（キー）がmに存在しない場合は、mに要素を追加し、スライスに要素を追加する。
+		if _, ok := m[e]; !ok {
+			m[e] = struct{}{}
+			noIncludeDuplicatedElements = append(noIncludeDuplicatedElements, e)
+		}
+		// mに要素が存在する場合はスキップ（何もしない）
 	}
 
-	// mから要素（key）だけを取り出して、新しいスライスに格納
-	// バグ：forでmapのキーを取り出しているが、このキーの順序はランダムになってしまう。　-> 元のinputのスライスの要素の順番が崩れる。
-	for e := range m {
-		noIncludeDuplicatedElements = append(noIncludeDuplicatedElements, e)
-	}
 	return noIncludeDuplicatedElements
 }
 
