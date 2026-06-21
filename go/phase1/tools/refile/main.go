@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -49,12 +51,14 @@ type DateFileMove struct {
 type FilePathMove struct {
 	BeforePath string
 	AfterPath  string
+	// isMoveもつべき？
 }
 
 // １ファイルに対する操作結果
-type FlieOperationResult struct {
-	FileName string // 操作対象のファイル
-	Result   string // 対象ファイルの操作結果
+type FileOperationResult struct {
+	CurrentFilePath string // 現在のファイルパス
+	PlannedPath     string // 計画後のファイルパス
+	Result          string // 対象ファイルの操作結果 // complete（完了）| skip（衝突）| error（エラー）| unchange（変更なし）
 }
 
 // ファイルの操作の計画サマリー(計画サマリ)
@@ -96,8 +100,17 @@ func parseCommnads() (*Commands, error) {
 
 	// 入力されたパスがファイルかディレクトリか判定
 	// ディレクトリだった場合、存在するかどうか
-	if _, err := isDirectoryOrFileAndExist(inputPath); err != nil {
+	if _, err := isExistingDir(inputPath); err != nil {
 		return nil, err
+	}
+
+	// 追加：空ディレクトリか
+	empty, err := isEmptyDir(inputPath)
+	if err != nil {
+		return nil, err
+	}
+	if empty {
+		return nil, errors.New("空ディレクトリです。")
 	}
 
 	// --by seqの時に、--prefixが指定されているか
@@ -117,9 +130,9 @@ func parseCommnads() (*Commands, error) {
 
 // ディレクトリかファイルかを判定して、ディレクトリだった場合、存在を判定して、存在する場合はtrueを返す。
 // そのほかの場合はfalseを返す。
-func isDirectoryOrFileAndExist(inputPath string) (bool, error) {
+func isExistingDir(path string) (bool, error) {
 
-	pathInfo, err := os.Stat(inputPath) // ファイルもしくはディレクトリが存在するか
+	pathInfo, err := os.Stat(path) // ファイルもしくはディレクトリが存在するか
 
 	if err != nil { // ファイルまたはディレクトリが存在しない
 		return false, errors.New("存在しないパスです。")
@@ -130,9 +143,22 @@ func isDirectoryOrFileAndExist(inputPath string) (bool, error) {
 	return true, nil
 }
 
+// ディレクトリが空か判定
+func isEmptyDir(path string) (bool, error) {
+	empty, err := os.ReadDir(path)
+	if err != nil { // Read Error
+		return false, err
+	}
+
+	if len(empty) == 0 { // 空の場合
+		return true, nil
+	}
+	return false, nil
+}
+
 // 対象ディレクトリのファイルパスを全て返す（ディレクトリかどうかを区別しない）
-func listAllFilesPath(targetDir string) ([]FileBaseInfo, error) {
-	fileBaseInfo := make([]FileBaseInfo, 0) // len設定は？
+func listFilesPath(targetDir string) ([]FileBaseInfo, error) {
+	fileBaseInfo := make([]FileBaseInfo, 0) // len設定はしない。理由：対象ディレクトリのファイル数がわからないため。
 
 	err := filepath.WalkDir(targetDir, func(path string, d fs.DirEntry, err error) error {
 
@@ -150,7 +176,7 @@ func listAllFilesPath(targetDir string) ([]FileBaseInfo, error) {
 }
 
 // ファイル移動の対象かどうかを判定してファイル名とパスと判定結果を返す。（--recursiveに対応）
-func listAllFilesIsMove(targetDir string, recursive bool, fileBaseInfo []FileBaseInfo) []IsFileMove {
+func listFilesIsMove(targetDir string, recursive bool, fileBaseInfo []FileBaseInfo) []IsFileMove {
 
 	isFilesPathAndMove := make([]IsFileMove, 0, len(fileBaseInfo))
 
@@ -160,9 +186,9 @@ func listAllFilesIsMove(targetDir string, recursive bool, fileBaseInfo []FileBas
 			path := strings.TrimPrefix(file.FilePath, targetDir+"/") //　パスから対象ディレクトリのパスを除外
 			if strings.Contains(path, "/") {                         // 最初の文字が「/」だったら、ディレクトリと判断して除外。
 				isFilesPathAndMove = append(isFilesPathAndMove, IsFileMove{FileBaseInfo: file, IsMove: false})
+				continue
 			}
 			isFilesPathAndMove = append(isFilesPathAndMove, IsFileMove{FileBaseInfo: file, IsMove: true})
-
 		}
 		return isFilesPathAndMove
 	}
@@ -185,7 +211,7 @@ func extractFilesExtension(isFilesdPathAndMove []IsFileMove) []ExtFileMove {
 	return extFilesMove
 }
 
-// ext: ファイル名と拡張子から移動後のパス（計画）を作成する。
+// ext: ファイル名と拡張子から移動後のパスを返す関数
 func makeExtPathPlan(targetDir string, extFilesMove []ExtFileMove) []FilePathMove {
 
 	extFilePathMove := make([]FilePathMove, 0, len(extFilesMove))
@@ -193,18 +219,18 @@ func makeExtPathPlan(targetDir string, extFilesMove []ExtFileMove) []FilePathMov
 	for _, file := range extFilesMove {
 		if !file.FileInfo.IsMove { // 移動しない場合
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: file.FileInfo.FileBaseInfo.FilePath}) // パス変更なし
+			continue                                                                                                                                                 // 忘れ注意
 		}
-
 		// 移動する場合
-		if file.Extension == ".jpg" { // jpg
+		if file.Extension == ".jpg" {
 			planPath := targetDir + "/JPG" + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
 		}
-		if file.Extension == ".pdf" { // pdf
+		if file.Extension == ".pdf" {
 			planPath := targetDir + "/PDF" + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
 		}
-		if file.Extension == ".png" { //png
+		if file.Extension == ".png" {
 			planPath := targetDir + "/PNG" + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
 
@@ -216,14 +242,104 @@ func makeExtPathPlan(targetDir string, extFilesMove []ExtFileMove) []FilePathMov
 		}
 		// その他の拡張子があれば追加していく
 	}
-
 	return extFilePathMove
 }
 
-// ext:現在のパスと移動後のパスを比較して、衝突と冪等を判定する関数
-func compareCurrentPathAndPlannedPath(currentPath []string, plannedPath []string) {
-	// 全く同じ場合
+// 計画ロジック（重要）
+// 判定層１：冪等かどうかを判定
+func isIndempotent(filePathMove []FilePathMove) bool {
+
+	var pathMatchCount int // 移動前と移動後でマッチしたパスの回数をカウント
+
+	if len(filePathMove) == 0 { // 空スライス、nilを判定
+		return false
+	}
+
+	for _, file := range filePathMove {
+		if file.BeforePath == file.AfterPath {
+			pathMatchCount++
+		}
+	}
+
+	if pathMatchCount == len(filePathMove) { // もし、[]FilePathMoveが空スライスだった場合にもtrueになってしまう...
+		return true
+	}
+	return false
 }
+
+// 判定層２：衝突を判定
+// 移動前パスおよび移動後パスで衝突検知。工夫：recursiveに意識しないような実装にした。
+// recursiveを意識すると、recursiveの値で分岐することになりそうだから、依存を無くそうとした。
+func hasPathCollision(filePathMove []FilePathMove) []FileOperationResult {
+
+	fmt.Println(len(filePathMove))
+
+	notChangePathes := make([]FilePathMove, 0, len(filePathMove)) // 変更しない予定のパスグループ
+	changePathes := make([]FilePathMove, 0, len(filePathMove))    // 変更予定のパスグループ
+
+	filesOperationResult := make([]FileOperationResult, 0, len(filePathMove))
+
+	for _, file := range filePathMove { //グループ化
+		if file.BeforePath == file.AfterPath {
+			notChangePathes = append(notChangePathes, file)
+		} else {
+			changePathes = append(changePathes, file)
+		}
+	}
+
+	for _, notChangePath := range notChangePathes { // notChangeを構造体にマッピング（変更しないものは計画がすでに決まっているので、先に格納）
+		filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: notChangePath.BeforePath, PlannedPath: notChangePath.AfterPath, Result: "unchange"})
+	}
+
+	// 変更しないものと、変更予定のものを比較
+	for _, notChangePath := range notChangePathes {
+		for _, changePath := range changePathes {
+			if notChangePath.BeforePath == changePath.AfterPath { // 同じもののグループの現在のパスと、違うものの変更予定のパスが同じ
+				filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: changePath.BeforePath, PlannedPath: changePath.BeforePath, Result: "skip"})
+
+				// changePathの中で、notChangePathと被ったものについては、予定が確定したので、変更予定のグループ（changePathes）から除外する。
+				for i, path := range changePathes {
+					if path.BeforePath == changePath.BeforePath {
+						changePathes = slices.Delete(changePathes, i, i+1) // 要素のi番目を削除
+					}
+				}
+			}
+			// かぶらなければ何もしない（理由：まだ計画が決まっていないため）
+		}
+	}
+
+	// 変更予定どうしの衝突判定
+	// filesOperationResultの被り注意！！（同じパスが２つ入らないように！）
+
+	copySlice := make([]FilePathMove, len(changePathes))
+	copy(copySlice, changePathes)
+
+	for _, path := range changePathes { // 比較基準
+		for _, copyPath := range copySlice { // 比較用
+
+			if reflect.DeepEqual(path, copyPath) {
+				continue // 同じのパスの衝突判定はスキップ
+			}
+
+			// 違うパスどうしでの衝突判定
+			if path.AfterPath == copyPath.AfterPath { // 衝突
+				// 比較した２つのパスの衝突が確定するので、2つともスライスにappendする
+				filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: path.BeforePath, PlannedPath: path.BeforePath, Result: "skip"})
+			}
+		}
+		copySlice = slices.Delete(copySlice, 0, 1) // 先頭の要素（パス）を削除。比較の重複(append)を防止
+	}
+	// 残っているcopySliceのパス要素は、変更可能で決定 -> マッピング
+	for _, path := range copySlice {
+		filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: path.BeforePath, PlannedPath: path.AfterPath, Result: "complete"})
+	}
+
+	fmt.Println(len(filesOperationResult))
+
+	return filesOperationResult
+}
+
+// スライスの中の要素のフィールドを指定して、削除する汎用関数
 
 // コマンドとパスを受け取って、ファイル操作を計画してサマリを返す関数（dry-run）
 func summaryFileOperationPlan(byCommand string) PlanSummary {
@@ -314,8 +430,20 @@ func main() {
 		resultSummary := applyPlanAndaggregateResultSummary(commands.By)
 		displayFileOperationResult(resultSummary)
 
-		allFilesPath, err := listAllFilesPath(commands.Path)
-		fmt.Println(makeExtPathPlan(commands.Path, extractFilesExtension(listAllFilesIsMove(commands.Path, commands.Recursive, allFilesPath))))
+		allFilesPath, err := listFilesPath(commands.Path)
+		fmt.Println(allFilesPath)
+
+		filesIsMove := listFilesIsMove(commands.Path, commands.Recursive, allFilesPath)
+		fmt.Println(filesIsMove)
+
+		extFileMove := extractFilesExtension(filesIsMove)
+		fmt.Println(extFileMove)
+
+		filePathMove := makeExtPathPlan(commands.Path, extFileMove)
+		fmt.Println(filePathMove)
+
+		planPath := hasPathCollision(filePathMove)
+		fmt.Println(planPath)
 
 		return
 
