@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 )
@@ -272,12 +271,10 @@ func isIndempotent(filePathMove []FilePathMove) bool {
 // recursiveを意識すると、recursiveの値で分岐することになりそうだから、依存を無くそうとした。
 func hasPathCollision(filePathMove []FilePathMove) []FileOperationResult {
 
-	fmt.Println(len(filePathMove))
-
-	notChangePathes := make([]FilePathMove, 0, len(filePathMove)) // 変更しない予定のパスグループ
+	notChangePathes := make([]FilePathMove, 0, len(filePathMove)) // 変更しないパスグループ
 	changePathes := make([]FilePathMove, 0, len(filePathMove))    // 変更予定のパスグループ
 
-	filesOperationResult := make([]FileOperationResult, 0, len(filePathMove))
+	filesOperationResult := make([]FileOperationResult, 0, len(filePathMove)) // 決定した予定を格納するスライス
 
 	for _, file := range filePathMove { //グループ化
 		if file.BeforePath == file.AfterPath {
@@ -287,22 +284,21 @@ func hasPathCollision(filePathMove []FilePathMove) []FileOperationResult {
 		}
 	}
 
+	fmt.Println(changePathes)
+
 	for _, notChangePath := range notChangePathes { // notChangeを構造体にマッピング（変更しないものは計画がすでに決まっているので、先に格納）
 		filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: notChangePath.BeforePath, PlannedPath: notChangePath.AfterPath, Result: "unchange"})
 	}
 
 	// 変更しないものと、変更予定のものを比較
 	for _, notChangePath := range notChangePathes {
-		for _, changePath := range changePathes {
+		for i, changePath := range changePathes {
 			if notChangePath.BeforePath == changePath.AfterPath { // 同じもののグループの現在のパスと、違うものの変更予定のパスが同じ
+
 				filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: changePath.BeforePath, PlannedPath: changePath.BeforePath, Result: "skip"})
 
 				// changePathの中で、notChangePathと被ったものについては、予定が確定したので、変更予定のグループ（changePathes）から除外する。
-				for i, path := range changePathes {
-					if path.BeforePath == changePath.BeforePath {
-						changePathes = slices.Delete(changePathes, i, i+1) // 要素のi番目を削除
-					}
-				}
+				changePathes = slices.Delete(changePathes, i, i+1) // 要素のi番目を削除
 			}
 			// かぶらなければ何もしない（理由：まだ計画が決まっていないため）
 		}
@@ -310,32 +306,32 @@ func hasPathCollision(filePathMove []FilePathMove) []FileOperationResult {
 
 	// 変更予定どうしの衝突判定
 	// filesOperationResultの被り注意！！（同じパスが２つ入らないように！）
-
 	copySlice := make([]FilePathMove, len(changePathes))
 	copy(copySlice, changePathes)
 
-	for _, path := range changePathes { // 比較基準
+	for _, path := range changePathes { // 比較対象 pathの被りを見る
+
 		for _, copyPath := range copySlice { // 比較用
 
-			if reflect.DeepEqual(path, copyPath) {
+			if path.BeforePath == copyPath.BeforePath { // BeforePathは一意なので、パスが同じかどうかを判別
 				continue // 同じのパスの衝突判定はスキップ
 			}
 
-			// 違うパスどうしでの衝突判定
+			// 衝突判定
 			if path.AfterPath == copyPath.AfterPath { // 衝突
 				// 比較した２つのパスの衝突が確定するので、2つともスライスにappendする
 				filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: path.BeforePath, PlannedPath: path.BeforePath, Result: "skip"})
 			}
 		}
-		copySlice = slices.Delete(copySlice, 0, 1) // 先頭の要素（パス）を削除。比較の重複(append)を防止
-	}
-	// 残っているcopySliceのパス要素は、変更可能で決定 -> マッピング
-	for _, path := range copySlice {
+
+		// 衝突判定に引っ掛からなかったら、変更が確定　-> 構造体にマッピング
 		filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: path.BeforePath, PlannedPath: path.AfterPath, Result: "complete"})
+
+		// 先頭の要素（パス）を削除。比較の重複(append)を防止
+		copySlice = slices.Delete(copySlice, 0, 1)
 	}
 
-	fmt.Println(len(filesOperationResult))
-
+	fmt.Println(len(filesOperationResult)) //1
 	return filesOperationResult
 }
 
@@ -431,13 +427,10 @@ func main() {
 		displayFileOperationResult(resultSummary)
 
 		allFilesPath, err := listFilesPath(commands.Path)
-		fmt.Println(allFilesPath)
 
 		filesIsMove := listFilesIsMove(commands.Path, commands.Recursive, allFilesPath)
-		fmt.Println(filesIsMove)
 
 		extFileMove := extractFilesExtension(filesIsMove)
-		fmt.Println(extFileMove)
 
 		filePathMove := makeExtPathPlan(commands.Path, extFileMove)
 		fmt.Println(filePathMove)
