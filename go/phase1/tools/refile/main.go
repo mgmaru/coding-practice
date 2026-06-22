@@ -59,19 +59,22 @@ type FileOperationResult struct {
 	Result          string // 対象ファイルの操作結果 // complete（完了）| skip（衝突）| error（エラー）| unchange（変更なし）
 }
 
-// ファイルの操作の計画サマリー(計画サマリ)
+// 計画サマリ
 type PlanSummary struct {
 	AllFiles      int // 全てのファイル数
 	CompleteFiles int // 完了する/した　ファイル数
 	SkipFiles     int // スキップしたファイル数（衝突したファイル数）
 	ErrorFiles    int // エラーファイル数（衝突以外の何らかの理由でエラー）
+	UnchangeFiles int // 変更なしファイル
 }
 
+// 実行結果サマリ
 type ResultSummary struct {
 	AllFiles      int // 全てのファイル数
 	CompleteFiles int // 完了する/した　ファイル数
 	SkipFiles     int // スキップしたファイル数
 	ErrorFiles    int // エラーファイル数
+	UnChangeFiles int // 変更なしファイル
 }
 
 // コマンドをパースする関数：入力したコマンド形式が正しいかどうかを判定する。
@@ -215,7 +218,7 @@ func makeExtPathPlan(targetDir string, extFilesMove []ExtFileMove) []FilePathMov
 	extFilePathMove := make([]FilePathMove, 0, len(extFilesMove))
 
 	for _, file := range extFilesMove {
-		if !file.FileInfo.IsMove { // 移動しない場合
+		if !file.FileInfo.IsMove { // 移動しない場合 unchange
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: file.FileInfo.FileBaseInfo.FilePath}) // パス変更なし
 			continue                                                                                                                                                 // 忘れ注意
 		}
@@ -268,7 +271,7 @@ func isIndempotent(filePathMove []FilePathMove) bool {
 // 判定層２：衝突を判定
 // 移動前パスおよび移動後パスで衝突検知。工夫：recursiveに意識しないような実装にした。
 // recursiveを意識すると、recursiveの値で分岐することになりそうだから、依存を無くそうとした。
-func hasPathCollision(filePathMove []FilePathMove) []FileOperationResult {
+func hasPathConflict(filePathMove []FilePathMove) []FileOperationResult {
 
 	notChangePathes := make([]FilePathMove, 0, len(filePathMove)) // 変更しないパスグループ
 	changePathes := make([]FilePathMove, 0, len(filePathMove))    // 変更予定のパスグループ
@@ -350,30 +353,52 @@ func hasPathCollision(filePathMove []FilePathMove) []FileOperationResult {
 	return filesOperationResult
 }
 
-// スライスの中の要素のフィールドを指定して、削除する汎用関数
+// 計画結果を受け取って、サマリを返す関数（dry-run）
+func summaryFileOperationPlan(fileOperationResult []FileOperationResult) PlanSummary {
 
-// コマンドとパスを受け取って、ファイル操作を計画してサマリを返す関数（dry-run）
-func summaryFileOperationPlan(byCommand string) PlanSummary {
+	var completeFilesCount int
+	var skipFilesCount int
+	var errorFilesCount int
+	var unchangeFilesCount int
 
-	if byCommand == "ext" { // extの計画を立てる
+	allFilesCount := len(fileOperationResult)
 
-		return PlanSummary{}
+	for _, path := range fileOperationResult {
+		if path.Result == "complete" {
+			completeFilesCount++
+		}
+		if path.Result == "skip" {
+			skipFilesCount++
+		}
+		if path.Result == "error" {
+			errorFilesCount++
+		}
+		if path.Result == "unchange" { //unchange
+			unchangeFilesCount++
+		}
 	}
-	if byCommand == "data" { // dataの計画を立てる
 
-		return PlanSummary{}
-	} else { // seqの計画を立てる
-
-		return PlanSummary{}
-	}
+	return PlanSummary{AllFiles: allFilesCount, CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount}
 }
 
-// ファイル操作のサマリを受け取って、計画を表示する関数
+// ファイル操作のサマリを受け取って計画を表示する関数
 func displayFileOperationPlan(planSummary PlanSummary) {
-	fmt.Printf("%d件のファイルをサブフォルダに移動します。", planSummary.CompleteFiles)
+
+	if planSummary.CompleteFiles > 0 { // completeが１件以上で表示
+		fmt.Printf("%d件のファイルをサブフォルダに移動します。", planSummary.CompleteFiles)
+	}
+	if planSummary.SkipFiles > 0 { // skipが1件以上で表示
+		fmt.Printf("%d件のファイル移動をスキップします。", planSummary.SkipFiles)
+	}
+	if planSummary.ErrorFiles > 0 { // errorが1件以上で表示
+		fmt.Printf("%d件のファイルが移動できません。", planSummary.SkipFiles)
+	}
+	if planSummary.UnchangeFiles > 0 { // unchangeが1件以上で表示
+		fmt.Printf("%d件のファイルの変更はありません。", planSummary.UnchangeFiles)
+	}
 }
 
-// 計画を実行するかしないかを返す関数
+// 計画を実行するかしないかを表示して結果を返す関数
 func isApplyPlan() (bool, error) {
 
 	var carryOut string
@@ -412,20 +437,38 @@ func displayFileOperationResult(resultSummary ResultSummary) {
 
 func main() {
 
+	// コマンドパース
 	commands, err := parseCommnads() // コマンドとパスを取得
 	if err != nil {                  // エラーの場合、コンソールに出す。
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	// dry-run
-	if !commands.Apply {
+	allFilesPath, err := listFilesPath(commands.Path)
+	filesIsMove := listFilesIsMove(commands.Path, commands.Recursive, allFilesPath)
 
-		// Plan
-		filOperationSummary := summaryFileOperationPlan(commands.By)
+	// date
 
-		displayFileOperationPlan(filOperationSummary) // サマリーを表示
-		isApply, err := isApplyPlan()                 // ユーザ入力
+	// seq
+
+	if !commands.Apply { // dry-run
+
+		// コマンドごとに計画を立てる
+		if commands.By == "ext" { // ext
+			extFileMove := extractFilesExtension(filesIsMove)
+			filePathMove := makeExtPathPlan(commands.Path, extFileMove)
+			planPath := hasPathConflict(filePathMove)
+			filOperationSummary := summaryFileOperationPlan(planPath)
+			displayFileOperationPlan(filOperationSummary) // サマリーを表示
+		}
+		if commands.By == "date" { // date
+
+		}
+		if commands.By == "seq" { // seq
+
+		}
+
+		isApply, err := isApplyPlan() // ユーザ入力
 		if err != nil {
 			// 実行しない
 			fmt.Println("scan error")
@@ -438,25 +481,11 @@ func main() {
 		}
 
 		// Apply
-		resultSummary := applyPlanAndaggregateResultSummary(commands.By)
-		displayFileOperationResult(resultSummary)
-
-		allFilesPath, err := listFilesPath(commands.Path)
-
-		filesIsMove := listFilesIsMove(commands.Path, commands.Recursive, allFilesPath)
-
-		extFileMove := extractFilesExtension(filesIsMove)
-
-		filePathMove := makeExtPathPlan(commands.Path, extFileMove)
-		fmt.Println(filePathMove)
-
-		planPath := hasPathCollision(filePathMove)
-		fmt.Println(planPath)
+		fmt.Println("実行します。")
 
 		return
 
-		// apply（not dry-run）
-	} else {
+	} else { // apply（not dry-run）
 
 		// Aplly
 		resultSummary := applyPlanAndaggregateResultSummary(commands.By)
