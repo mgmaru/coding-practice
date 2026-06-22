@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 )
 
@@ -274,7 +273,7 @@ func hasPathCollision(filePathMove []FilePathMove) []FileOperationResult {
 	notChangePathes := make([]FilePathMove, 0, len(filePathMove)) // 変更しないパスグループ
 	changePathes := make([]FilePathMove, 0, len(filePathMove))    // 変更予定のパスグループ
 
-	filesOperationResult := make([]FileOperationResult, 0, len(filePathMove)) // 決定した予定を格納するスライス
+	filesOperationResult := make([]FileOperationResult, 0, len(filePathMove)) // 予定が決定したパスを格納するスライス
 
 	for _, file := range filePathMove { //グループ化
 		if file.BeforePath == file.AfterPath {
@@ -284,54 +283,70 @@ func hasPathCollision(filePathMove []FilePathMove) []FileOperationResult {
 		}
 	}
 
-	fmt.Println(changePathes)
-
-	for _, notChangePath := range notChangePathes { // notChangeを構造体にマッピング（変更しないものは計画がすでに決まっているので、先に格納）
+	// notChangeを構造体にマッピング（変更しないものは計画がすでに決まっているので、先に格納）
+	for _, notChangePath := range notChangePathes {
 		filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: notChangePath.BeforePath, PlannedPath: notChangePath.AfterPath, Result: "unchange"})
 	}
 
-	// 変更しないものと、変更予定のものを比較
-	for _, notChangePath := range notChangePathes {
-		for i, changePath := range changePathes {
+	// 変更しないパスと、変更予定のパスの衝突を判定
+	for _, notChangePath := range notChangePathes { // notChangePathは一意。 -> changePathが2回appendされることはない。
+		for _, changePath := range changePathes {
 			if notChangePath.BeforePath == changePath.AfterPath { // 同じもののグループの現在のパスと、違うものの変更予定のパスが同じ
-
 				filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: changePath.BeforePath, PlannedPath: changePath.BeforePath, Result: "skip"})
-
-				// changePathの中で、notChangePathと被ったものについては、予定が確定したので、変更予定のグループ（changePathes）から除外する。
-				changePathes = slices.Delete(changePathes, i, i+1) // 要素のi番目を削除
+				break // あるchangePathとnotChangePathが被った時点で、そのchangePathを調べる必要はない。
 			}
 			// かぶらなければ何もしない（理由：まだ計画が決まっていないため）
 		}
 	}
 
-	// 変更予定どうしの衝突判定
-	// filesOperationResultの被り注意！！（同じパスが２つ入らないように！）
-	copySlice := make([]FilePathMove, len(changePathes))
-	copy(copySlice, changePathes)
+	// スライスchangePathからすでにappendされているパスを削除する。
+	// すでに計画が決定した現在のパスをの存在を格納する。
+	m := make(map[string]struct{}, len(changePathes))
 
-	for _, path := range changePathes { // 比較対象 pathの被りを見る
-
-		for _, copyPath := range copySlice { // 比較用
-
-			if path.BeforePath == copyPath.BeforePath { // BeforePathは一意なので、パスが同じかどうかを判別
-				continue // 同じのパスの衝突判定はスキップ
-			}
-
-			// 衝突判定
-			if path.AfterPath == copyPath.AfterPath { // 衝突
-				// 比較した２つのパスの衝突が確定するので、2つともスライスにappendする
-				filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: path.BeforePath, PlannedPath: path.BeforePath, Result: "skip"})
-			}
-		}
-
-		// 衝突判定に引っ掛からなかったら、変更が確定　-> 構造体にマッピング
-		filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: path.BeforePath, PlannedPath: path.AfterPath, Result: "complete"})
-
-		// 先頭の要素（パス）を削除。比較の重複(append)を防止
-		copySlice = slices.Delete(copySlice, 0, 1)
+	for _, v := range filesOperationResult { // 計画が決定した
+		m[v.CurrentFilePath] = struct{}{}
 	}
 
-	fmt.Println(len(filesOperationResult)) //1
+	// changePathのパスを１つずつ見ていって、mにすでに存在したら、新しいスライスに入れる
+	remainingChangePathes := make([]FilePathMove, 0, len(changePathes))
+
+	for _, path := range changePathes {
+		if _, ok := m[path.BeforePath]; !ok { // mにキーが存在しなかったら、まだ計画が決まっていないパス -> スライスに格納
+			remainingChangePathes = append(remainingChangePathes, path)
+		}
+	}
+
+	// 計画が決まっていないパス（remainingChangePath）どうしの衝突を判定する。
+	// 注意：重複appendは許さないようにする。
+
+	n := make(map[string]struct{}, len(remainingChangePathes)) // remainingChangePathesで計画が決まったもののBeforePathを格納
+
+	for _, i := range remainingChangePathes {
+		for _, j := range remainingChangePathes {
+			if i == j { // 同じパスの比較はスキップ
+				continue
+			}
+			if i.AfterPath == j.AfterPath { //衝突 // 移動予定のパスで比較
+				if _, ok := n[j.BeforePath]; ok { // すでに結果が決まっているかを判定。 -> 決まっていたらappendをスキップ
+					continue
+				}
+				// まだ決まっていない場合 // パスをスライス`filesOperationResult`にappend
+				filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: j.BeforePath, PlannedPath: j.BeforePath, Result: "skip"})
+				// 計画が決まったパスをnに格納
+				n[j.BeforePath] = struct{}{}
+			}
+		}
+	}
+
+	// 衝突しなかったパス（計画が決まっていないパス）を抽出 -> complete
+	for _, path := range remainingChangePathes {
+		if _, ok := n[path.BeforePath]; !ok { // nにパスがない -> まだ計画が決まっていない。(衝突しなかったパス)
+			filesOperationResult = append(filesOperationResult, FileOperationResult{CurrentFilePath: path.BeforePath, PlannedPath: path.AfterPath, Result: "complete"})
+		}
+	}
+
+	fmt.Println(len(filesOperationResult))
+
 	return filesOperationResult
 }
 
