@@ -90,9 +90,9 @@ func parseCommnads() (*Commands, error) {
 
 	flag.Parse()
 
-	args := flag.Args() // 対象ディレクトリ（絶対パスも相対パスも入ってくる）
+	args := flag.Args()
 
-	// ディレクトリが指定されていない
+	// ディレクトリが指定されていない場合
 	if len(args) < 1 {
 		return nil, errors.New("ディレクトリを指定してください。")
 	}
@@ -105,7 +105,7 @@ func parseCommnads() (*Commands, error) {
 		return nil, err
 	}
 
-	// 追加：空ディレクトリか
+	// 空ディレクトリか
 	empty, err := isEmptyDir(inputPath)
 	if err != nil {
 		return nil, err
@@ -119,6 +119,7 @@ func parseCommnads() (*Commands, error) {
 		return nil, errors.New("prefixを指定してください。")
 	}
 
+	// コマンドを返却
 	return &Commands{
 		Path:      args[0],
 		By:        *by,
@@ -176,7 +177,7 @@ func listFilesPath(targetDir string) ([]FileBaseInfo, error) {
 	return fileBaseInfo, nil
 }
 
-// ファイル移動の対象かどうかを判定してファイル名とパスと判定結果を返す。（--recursiveに対応）
+// ファイル移動の対象かどうかを判定してファイル名とパスと判定結果を返す（--recursiveに対応）
 func listFilesIsMove(targetDir string, recursive bool, fileBaseInfo []FileBaseInfo) []IsFileMove {
 
 	isFilesPathAndMove := make([]IsFileMove, 0, len(fileBaseInfo))
@@ -224,15 +225,15 @@ func makeExtPathPlan(targetDir string, extFilesMove []ExtFileMove) []FilePathMov
 		}
 		// 移動する場合
 		if file.Extension == ".jpg" {
-			planPath := targetDir + "/JPG" + "/" + file.FileInfo.FileBaseInfo.FileName
+			planPath := targetDir + "/jpg" + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
 		}
 		if file.Extension == ".pdf" {
-			planPath := targetDir + "/PDF" + "/" + file.FileInfo.FileBaseInfo.FileName
+			planPath := targetDir + "/pdf" + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
 		}
 		if file.Extension == ".png" {
-			planPath := targetDir + "/PNG" + "/" + file.FileInfo.FileBaseInfo.FileName
+			planPath := targetDir + "/png" + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
 
 		}
@@ -244,6 +245,39 @@ func makeExtPathPlan(targetDir string, extFilesMove []ExtFileMove) []FilePathMov
 		// その他の拡張子があれば追加していく
 	}
 	return extFilePathMove
+}
+
+// date:対象ファイルからファイルの更新月を抽出する。
+func extractFilesDate(isFilesdPathAndMove []IsFileMove) ([]DateFileMove, error) {
+
+	dateFilesInfo := make([]DateFileMove, 0, len(isFilesdPathAndMove))
+
+	for _, file := range isFilesdPathAndMove {
+		fileInfo, err := os.Stat(file.FileBaseInfo.FilePath)
+		if err != nil {
+			return nil, err
+		}
+		dateFilesInfo = append(dateFilesInfo, DateFileMove{FileInfo: file, Date: fileInfo.ModTime().Format("2006-01-02")})
+	}
+	return dateFilesInfo, nil
+}
+
+// date: ファイル情報および拡張子から移動計画を返す関数
+func makeDatePathPlan(targetDir string, dateFilesMove []DateFileMove) []FilePathMove {
+
+	filePathMove := make([]FilePathMove, 0, len(dateFilesMove))
+
+	for _, file := range dateFilesMove {
+		if !file.FileInfo.IsMove { // 移動しない場合
+			filePathMove = append(filePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: file.FileInfo.FileBaseInfo.FilePath})
+			continue
+		}
+		// 移動する場合 パスを作る
+		date := file.Date
+		planPath := targetDir + "/" + string(date[:7]) + "/" + file.FileInfo.FileBaseInfo.FileName // Date: 2026-06形式
+		filePathMove = append(filePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
+	}
+	return filePathMove
 }
 
 // 計画ロジック（重要）
@@ -353,7 +387,7 @@ func hasPathConflict(filePathMove []FilePathMove) []FileOperationResult {
 	return filesOperationResult
 }
 
-// 計画結果を受け取って、サマリを返す関数（dry-run）
+// 計画結果を受け取ってサマリを返す関数（dry-run）
 func summaryFileOperationPlan(fileOperationResult []FileOperationResult) PlanSummary {
 
 	var completeFilesCount int
@@ -416,8 +450,7 @@ func isApplyPlan() (bool, error) {
 	return false, nil // 実行しない
 }
 
-// コマンドを受け取って、計画を実行する関数
-// 設計意思：ーーby ext|date|seqを１本化
+// 実行する関数
 func applyPlanAndaggregateResultSummary(byCommand string) ResultSummary {
 
 	if byCommand == "ext" { // ext
@@ -447,28 +480,51 @@ func main() {
 	allFilesPath, err := listFilesPath(commands.Path)
 	filesIsMove := listFilesIsMove(commands.Path, commands.Recursive, allFilesPath)
 
-	// date
-
-	// seq
-
 	if !commands.Apply { // dry-run
 
-		// コマンドごとに計画を立てる
 		if commands.By == "ext" { // ext
 			extFileMove := extractFilesExtension(filesIsMove)
 			filePathMove := makeExtPathPlan(commands.Path, extFileMove)
+
+			if isIndempotent(filePathMove) { // 冪等判定
+				fmt.Println("ファイルの変更はありません。")
+				return
+			}
+
 			planPath := hasPathConflict(filePathMove)
-			filOperationSummary := summaryFileOperationPlan(planPath)
-			displayFileOperationPlan(filOperationSummary) // サマリーを表示
-		}
-		if commands.By == "date" { // date
+			fileOperationSummary := summaryFileOperationPlan(planPath)
+			displayFileOperationPlan(fileOperationSummary) // サマリーを表示
+
+			fmt.Println(planPath)
 
 		}
+
+		if commands.By == "date" { // date
+			dateFileMove, err := extractFilesDate(filesIsMove)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			filePathMove := makeDatePathPlan(commands.Path, dateFileMove)
+
+			if isIndempotent(filePathMove) {
+				fmt.Println("ファイルの変更はありません。")
+				return
+			}
+
+			planPath := hasPathConflict(filePathMove)
+			fileOperationSummary := summaryFileOperationPlan(planPath)
+			displayFileOperationPlan(fileOperationSummary) // サマリーを表示
+
+			fmt.Println(planPath)
+		}
+
 		if commands.By == "seq" { // seq
 
 		}
 
-		isApply, err := isApplyPlan() // ユーザ入力
+		// ユーザ入力
+		isApply, err := isApplyPlan()
 		if err != nil {
 			// 実行しない
 			fmt.Println("scan error")
