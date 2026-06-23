@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -26,7 +28,7 @@ type FileBaseInfo struct {
 	FilePath string
 }
 
-// 移動前のファイルパスと移動するかの判定結果
+// 移動前のファイルパスと移動（リネーム）するかの判定結果
 // ext, date共通に使用するファイル情報
 type IsFileMove struct {
 	FileBaseInfo FileBaseInfo
@@ -45,11 +47,17 @@ type DateFileMove struct {
 	Date     string
 }
 
-// 1ファイルの移動前のパスと移動後のパス
+// seq用のファイル情報
+type SeqFileMove struct {
+	Extension string
+	Files     []IsFileMove
+}
+
+// 1ファイルの移動前のパスと移動後のパス // 衝突の判定に使用する
 type FilePathMove struct {
 	BeforePath string
 	AfterPath  string
-	// isMoveもつべき？
+	// isMoveもつべき？ -> いらない。理由：移動前のパスと移動後のパスで衝突は判定できる。
 }
 
 // １ファイルに対する操作結果
@@ -59,12 +67,21 @@ type FileOperationResult struct {
 	Result          string // 対象ファイルの操作結果 // complete（完了）| skip（衝突）| error（エラー）| unchange（変更なし）
 }
 
-// 計画サマリ
+// 移動計画サマリ
 type PlanSummary struct {
 	AllFiles      int // 全てのファイル数
 	CompleteFiles int // 完了する/した　ファイル数
 	SkipFiles     int // スキップしたファイル数（衝突したファイル数）
 	ErrorFiles    int // エラーファイル数（衝突以外の何らかの理由でエラー）
+	UnchangeFiles int // 変更なしファイル
+}
+
+// リネーム計画サマリ
+type RenamePlanSummary struct {
+	AllFiles      int // 全てのファイル数
+	CompleteFiles int // 完了する/した　ファイル数
+	// SkipFiles     int // スキップしたファイル数（衝突したファイル数）
+	// ErrorFiles    int // エラーファイル数（衝突以外の何らかの理由でエラー）
 	UnchangeFiles int // 変更なしファイル
 }
 
@@ -158,7 +175,8 @@ func isEmptyDir(path string) (bool, error) {
 	return false, nil
 }
 
-// 対象ディレクトリのファイルパスを全て返す（ディレクトリかどうかを区別しない）
+// 共通：対象ディレクトリのファイルパスを全て返す（ディレクトリかどうかを区別しない）。
+// 設計意思：共通で仕様する関数なので、どのコマンドであるかを意識しない。
 func listFilesPath(targetDir string) ([]FileBaseInfo, error) {
 	fileBaseInfo := make([]FileBaseInfo, 0) // len設定はしない。理由：対象ディレクトリのファイル数がわからないため。
 
@@ -177,7 +195,9 @@ func listFilesPath(targetDir string) ([]FileBaseInfo, error) {
 	return fileBaseInfo, nil
 }
 
-// ファイル移動の対象かどうかを判定してファイル名とパスと判定結果を返す（--recursiveに対応）
+// 共通：ファイル移動の対象かどうかを判定してファイル名とパスと判定結果を返す（--recursiveに対応）
+// 設計意思：共通で仕様する関数なので、どのコマンドであるかを意識しない。
+// 注意：seqのみ、recursiveは全てfalse
 func listFilesIsMove(targetDir string, recursive bool, fileBaseInfo []FileBaseInfo) []IsFileMove {
 
 	isFilesPathAndMove := make([]IsFileMove, 0, len(fileBaseInfo))
@@ -186,7 +206,7 @@ func listFilesIsMove(targetDir string, recursive bool, fileBaseInfo []FileBaseIn
 	if !recursive {
 		for _, file := range fileBaseInfo {
 			path := strings.TrimPrefix(file.FilePath, targetDir+"/") //　パスから対象ディレクトリのパスを除外
-			if strings.Contains(path, "/") {                         // 最初の文字が「/」だったら、ディレクトリと判断して除外。
+			if strings.Contains(path, "/") {                         // 残りのパスに「/」が含まれていたらディレクトリと判断（ファイルではない）。
 				isFilesPathAndMove = append(isFilesPathAndMove, IsFileMove{FileBaseInfo: file, IsMove: false})
 				continue
 			}
@@ -201,7 +221,7 @@ func listFilesIsMove(targetDir string, recursive bool, fileBaseInfo []FileBaseIn
 	return isFilesPathAndMove
 }
 
-// ext: ファイルの拡張子を抽出
+// ext / seq : ファイルの拡張子を抽出
 func extractFilesExtension(isFilesdPathAndMove []IsFileMove) []ExtFileMove {
 
 	extFilesMove := make([]ExtFileMove, 0, len(isFilesdPathAndMove))
@@ -235,12 +255,10 @@ func makeExtPathPlan(targetDir string, extFilesMove []ExtFileMove) []FilePathMov
 		if file.Extension == ".png" {
 			planPath := targetDir + "/png" + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
-
 		}
 		if file.Extension == "" { // no extension
 			planPath := targetDir + "/" + file.FileInfo.FileBaseInfo.FileName + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
-
 		}
 		// その他の拡張子があれば追加していく
 	}
@@ -280,6 +298,86 @@ func makeDatePathPlan(targetDir string, dateFilesMove []DateFileMove) []FilePath
 	return filePathMove
 }
 
+// seq仕様：seqは--recursiveコマンドは効かない（サブディレクトリは対象にしない。）
+// seq: ファイル情報と拡張子から拡張子ごとに分類して、mapで返す（ここでソートはしない）。
+func classifyExt(extFilesMove []ExtFileMove) []SeqFileMove {
+
+	// key： Extension value: files
+	m := make(map[string][]IsFileMove, len(extFilesMove))
+	seqFilesMove := make([]SeqFileMove, 0, len(extFilesMove))
+
+	for _, file := range extFilesMove { // 拡張子ごとにファイルを分類
+		m[file.Extension] = append(m[file.Extension], file.FileInfo)
+	}
+	// 構造体SeqFileMoveにマッピング
+	for ex, files := range m {
+		seqFilesMove = append(seqFilesMove, SeqFileMove{Extension: ex, Files: files})
+	}
+
+	return seqFilesMove
+}
+
+// seq: パスを作成する。（1.拡張子を昇順でソート -> 2.拡張子の中でファイル名でソート -> 3.パスを作る）
+func makeSeqPathPlan(targetDir string, seqFilesMove []SeqFileMove, prefix string) []FilePathMove {
+
+	filesPathMove := make([]FilePathMove, 0, len(seqFilesMove))
+
+	// 1. キー：拡張子について、昇順ソート
+	sort.Slice(seqFilesMove, func(i, j int) bool {
+		return seqFilesMove[i].Extension > seqFilesMove[j].Extension
+	})
+
+	// 2. 拡張子ごとのファイルのリストの中のファイル名でソート
+	for _, files := range seqFilesMove {
+		sort.Slice(files.Files, func(i, j int) bool {
+			return files.Files[i].FileBaseInfo.FileName > files.Files[j].FileBaseInfo.FileName
+		})
+	}
+
+	// パスを作成する
+	sortedFiles := make([]IsFileMove, 0, len(seqFilesMove))
+	for _, files := range seqFilesMove {
+		sortedFiles = append(sortedFiles, files.Files...) // ソートされたファイルを順番にappend
+	}
+
+	count := 1                         // ファイルの連番 初期値0
+	for _, file := range sortedFiles { // 順番にファイルを取り出してパスを作成する。
+		if !file.IsMove { // ファイルリネームをしない場合はスキップ // ディレクトリのファイルは無視。
+			continue
+		}
+		// ファイルのリネームをする場合はパスを作成する
+		afterPath := targetDir + "/" + prefix + "-" + intToSerialNumberString(count) + filepath.Ext(file.FileBaseInfo.FilePath)
+		filesPathMove = append(filesPathMove, FilePathMove{BeforePath: file.FileBaseInfo.FilePath, AfterPath: afterPath})
+
+		count++
+	}
+
+	return filesPathMove
+}
+
+// seq: intから連番の文字列を作成する関数
+// 仕様:連番2桁までは、桁の前に「0」を付与。3桁以上はそのまま。
+func intToSerialNumberString(num int) string {
+
+	strNum := strconv.Itoa(num)
+
+	if len(strNum) == 0 { //0バイト（一応）
+		serialNumber := "000"
+		return serialNumber
+	}
+	if len(strNum) == 1 { //1バイト
+		serialNumber := "00" + strNum
+		return serialNumber
+	}
+	if len(strNum) == 2 { //2バイト
+		serialNumber := "0" + strNum
+		return serialNumber
+	} else { // 3バイト以上
+		serialNumber := strNum
+		return serialNumber
+	}
+}
+
 // 計画ロジック（重要）
 // 判定層１：冪等かどうかを判定
 func isIndempotent(filePathMove []FilePathMove) bool {
@@ -303,8 +401,8 @@ func isIndempotent(filePathMove []FilePathMove) bool {
 }
 
 // 判定層２：衝突を判定
-// 移動前パスおよび移動後パスで衝突検知。工夫：recursiveに意識しないような実装にした。
-// recursiveを意識すると、recursiveの値で分岐することになりそうだから、依存を無くそうとした。
+// 移動前パスおよび移動後パスで衝突検知。
+// 注意：入力スライスの要素の並びを保証しない。
 func hasPathConflict(filePathMove []FilePathMove) []FileOperationResult {
 
 	notChangePathes := make([]FilePathMove, 0, len(filePathMove)) // 変更しないパスグループ
@@ -387,8 +485,8 @@ func hasPathConflict(filePathMove []FilePathMove) []FileOperationResult {
 	return filesOperationResult
 }
 
-// 計画結果を受け取ってサマリを返す関数（dry-run）
-func summaryFileOperationPlan(fileOperationResult []FileOperationResult) PlanSummary {
+// 移動計画結果を受け取ってサマリを返す関数
+func summaryFilesMovePlan(fileOperationResult []FileOperationResult) PlanSummary {
 
 	var completeFilesCount int
 	var skipFilesCount int
@@ -415,8 +513,27 @@ func summaryFileOperationPlan(fileOperationResult []FileOperationResult) PlanSum
 	return PlanSummary{AllFiles: allFilesCount, CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount}
 }
 
-// ファイル操作のサマリを受け取って計画を表示する関数
-func displayFileOperationPlan(planSummary PlanSummary) {
+// リネーム計画を受け取ってサマリを返す関数
+func summaryFilesRenamePlan(planPath []FilePathMove) RenamePlanSummary {
+	var completeFilesCount int
+	// var skipFilesCount int
+	// var errorFilesCount int
+	var unchangeFilesCount int
+
+	allFilesCount := len(planPath)
+
+	for _, path := range planPath {
+		if path.BeforePath == path.AfterPath {
+			unchangeFilesCount++
+			continue
+		}
+		completeFilesCount++
+	}
+	return RenamePlanSummary{AllFiles: allFilesCount, CompleteFiles: completeFilesCount, UnchangeFiles: unchangeFilesCount}
+}
+
+// ファイル操作のサマリを受け取って計画を表示する関数（ext, date）
+func displayFilesMovePlan(planSummary PlanSummary) {
 
 	if planSummary.CompleteFiles > 0 { // completeが１件以上で表示
 		fmt.Printf("%d件のファイルをサブフォルダに移動します。", planSummary.CompleteFiles)
@@ -429,6 +546,20 @@ func displayFileOperationPlan(planSummary PlanSummary) {
 	}
 	if planSummary.UnchangeFiles > 0 { // unchangeが1件以上で表示
 		fmt.Printf("%d件のファイルの変更はありません。", planSummary.UnchangeFiles)
+	}
+}
+
+// ファイルのリネームのサマリを受け取って計画を表示する関数
+// 備考：リネームは衝突が起きないので、skipCountはない。
+func displayFilesRenamePlan(renamePlanSummary RenamePlanSummary) {
+	if renamePlanSummary.CompleteFiles > 0 { // completeが１件以上で表示
+		fmt.Printf("%d件のファイルをリネームします。", renamePlanSummary.CompleteFiles)
+	}
+	// if renamePlanSummary.ErrorFiles > 0 { // errorが1件以上で表示
+	// 	fmt.Printf("%d件のファイルのリネームができません。", renamePlanSummary.SkipFiles)
+	// }
+	if renamePlanSummary.UnchangeFiles > 0 { // unchangeが1件以上で表示
+		fmt.Printf("%d件のファイルの変更はありません。", renamePlanSummary.UnchangeFiles)
 	}
 }
 
@@ -477,12 +608,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 共通処理
 	allFilesPath, err := listFilesPath(commands.Path)
-	filesIsMove := listFilesIsMove(commands.Path, commands.Recursive, allFilesPath)
 
-	if !commands.Apply { // dry-run
+	// dry-run
+	if !commands.Apply {
 
-		if commands.By == "ext" { // ext
+		// ext
+		if commands.By == "ext" {
+			filesIsMove := listFilesIsMove(commands.Path, commands.Recursive, allFilesPath)
 			extFileMove := extractFilesExtension(filesIsMove)
 			filePathMove := makeExtPathPlan(commands.Path, extFileMove)
 
@@ -492,14 +626,17 @@ func main() {
 			}
 
 			planPath := hasPathConflict(filePathMove)
-			fileOperationSummary := summaryFileOperationPlan(planPath)
-			displayFileOperationPlan(fileOperationSummary) // サマリーを表示
+			fileOperationSummary := summaryFilesMovePlan(planPath)
+			displayFilesMovePlan(fileOperationSummary) // サマリーを表示
 
 			fmt.Println(planPath)
 
 		}
 
-		if commands.By == "date" { // date
+		// date
+		if commands.By == "date" {
+
+			filesIsMove := listFilesIsMove(commands.Path, commands.Recursive, allFilesPath)
 			dateFileMove, err := extractFilesDate(filesIsMove)
 			if err != nil {
 				fmt.Println(err)
@@ -513,14 +650,27 @@ func main() {
 			}
 
 			planPath := hasPathConflict(filePathMove)
-			fileOperationSummary := summaryFileOperationPlan(planPath)
-			displayFileOperationPlan(fileOperationSummary) // サマリーを表示
+			fileOperationSummary := summaryFilesMovePlan(planPath)
+			displayFilesMovePlan(fileOperationSummary) // サマリーを表示
 
 			fmt.Println(planPath)
 		}
 
-		if commands.By == "seq" { // seq
+		// seq
+		if commands.By == "seq" {
+			filesIsMove := listFilesIsMove(commands.Path, false, allFilesPath)       // Case Seq is automatically recursive false.
+			extFileMove := extractFilesExtension(filesIsMove)                        // ファイル情報と拡張子
+			seqFileMove := classifyExt(extFileMove)                                  // 拡張子ごとに分類
+			planPath := makeSeqPathPlan(commands.Path, seqFileMove, commands.Prefix) // ソートしてパスを作成
 
+			if isIndempotent(planPath) {
+				fmt.Println("ファイルの変更はありません。")
+				return
+			} // 冪等でなければ、planPathがそのまま決定計画となる。
+			renameFileSummary := summaryFilesRenamePlan(planPath)
+			displayFilesRenamePlan(renameFileSummary)
+
+			fmt.Println(planPath)
 		}
 
 		// ユーザ入力
@@ -541,7 +691,8 @@ func main() {
 
 		return
 
-	} else { // apply（not dry-run）
+		// apply（not dry-run）
+	} else {
 
 		// Aplly
 		resultSummary := applyPlanAndaggregateResultSummary(commands.By)
