@@ -66,9 +66,6 @@ type FilePathHasConflict struct {
 	HasConflict  bool         // 衝突判定結果
 }
 
-type CompleteFiles struct {
-}
-
 // 移動計画サマリ
 type PlanSummary struct {
 	CompleteFiles     int // 移動できるファイル数
@@ -89,11 +86,11 @@ type RenamePlanSummary struct {
 
 // 実行結果サマリ
 type ResultSummary struct {
-	AllFiles      int // 全てのファイル数
-	CompleteFiles int // 完了する/した　ファイル数
-	SkipFiles     int // スキップしたファイル数
-	ErrorFiles    int // エラーファイル数
-	UnChangeFiles int // 変更なしファイル
+	CompleteFiles     int // 完了する/した　ファイル数
+	SkipFiles         int // スキップしたファイル数
+	ErrorFiles        int // エラーファイル数
+	UnChangeFiles     int // 変更なしファイル
+	CannotChangeFiles int // エラーによって変更できないファイル数
 }
 
 // コマンドをパースする関数：入力したコマンド形式が正しいかどうかを判定する。
@@ -342,7 +339,7 @@ func makeSeqPathPlan(targetDir string, seqFilesMove []SeqFileMove, prefix string
 		sortedFiles = append(sortedFiles, files.Files...) // ソートされたファイルを順番にappend
 	}
 
-	count := 1                         // ファイルの連番 初期値0
+	count := 1                         // ファイルの連番
 	for _, file := range sortedFiles { // 順番にファイルを取り出してパスを作成する。
 		if !file.IsMove { // ファイルリネームをしない場合はスキップ // ディレクトリのファイルは無視。
 			continue
