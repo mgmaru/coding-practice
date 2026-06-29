@@ -21,6 +21,8 @@ func TestFindUsersByKey_ID(t *testing.T) {
 		{name: "usersAndInputEmpty", users: []User{}, input: []int{}, keyOf: func(u User) int { return u.ID }, valueOf: func(u User) string { return u.Name }, want: []string{}},
 		{name: "usersEmpty", users: []User{}, input: []int{2, 1, 2}, keyOf: func(u User) int { return u.ID }, valueOf: func(u User) string { return u.Name }, want: []string{}},
 		{name: "inputEmpty", users: []User{{ID: 1, Name: "A"}, {ID: 2, Name: "B"}}, input: []int{}, keyOf: func(u User) int { return u.ID }, valueOf: func(u User) string { return u.Name }, want: []string{}},
+		// 修正：IDが欠損している場合を追加
+		{name: "IDDeficiency", users: []User{{ID: 1, Name: "A"}, {ID: 2, Name: "B"}}, input: []int{1, 3, 2}, keyOf: func(u User) int { return u.ID }, valueOf: func(u User) string { return u.Name }, want: []string{"A", "B"}},
 	}
 
 	for _, c := range cases {
