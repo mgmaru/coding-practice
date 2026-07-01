@@ -19,14 +19,15 @@ func aggregateDateStatus(input []Status) map[string]map[string]int {
 		m[s.Date] = append(m[s.Date], s.Level) //一旦、日付ごとのレベルを格納する // {06-01:[INFO, ERROR, INFO, WARNING, ...], 06-02:[INFO, WARNIG, ...]}
 	}
 
-	n := make(map[string]int, len(input)) // 日付ごと　-> キー：レベル　値：出現回数
 	out := make(map[string]map[string]int, len(input))
 	for key, vals := range m { // key:日付　vals:レベルのスライス // 注意：map mからforで取り出しているので、並び順が保証されていない。 -> ソートが必要
+		n := make(map[string]int, len(input)) // 日付ごと　-> キー：レベル　値：出現回数
 		for _, v := range vals {
-			if _, ok := n[v]; ok { // もし、mの中にLevelがあったら、出現回数をカウントアップ
+			if _, ok := n[v]; ok { // もし、nの中にLevelがあったら、出現回数をカウントアップ
 				n[v]++
+				continue // 忘れずに
 			}
-			// もしなかったら、キー(日付)と初期値を加える
+			// もしなかったら、キー(レベル)と初期値を加える
 			n[v] = 1 // 初期値
 		}
 		out[key] = n // キーを日付として、値にnを代入
