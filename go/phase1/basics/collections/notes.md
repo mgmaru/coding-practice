@@ -193,3 +193,123 @@ func CountElements(input []string) map[string]int {
 #### 実装時間
 - 2時間36分
 ---
+### 2026/7/1
+#### わかったこと
+- `map of map`のキーでソートする方法がわからなかった。
+  - でも、そもそも`map`構造は順序を保証できないので、キーでソートすることはできない。
+  - もし、ソートしたいのであれば、スライスにする必要がある。
+- `map`同士を比較する時に、`==`では比較できないので、`reflect.DeepEqual`を使用。
+  - `DeepEqual`で`map[string]int{"a":1, "b":2}`と`map[string]int{"b":2, "a":1}`を比較すると、`true`になる。
+  - **`DeepEqual`は`map`の並び順までは見ない。**
+- `map`のネストが多くなった時に、`{}`の数がわからなくなる。 -> ただし、書いてるとなれる。
+- `map`のキーに何が入りうるかは知っておくべき。
+#### バグ
+- 修正前コード
+```go
+	n := make(map[string]int, len(input)) // 日付ごと　-> キー：レベル　値：出現回数
+	out := make(map[string]map[string]int, len(input))
+	for key, vals := range m { // key:日付　vals:レベルのスライス // 注意：map mからforで取り出しているので、並び順が保証されていない。 -> ソートが必要
+		for _, v := range vals {
+			if _, ok := n[v]; ok { // もし、mの中にLevelがあったら、出現回数をカウントアップ
+				n[v]++
+			}
+			// もしなかったら、キー(日付)と初期値を加える
+			n[v] = 1 // 初期値
+		}
+		out[key] = n // キーを日付として、値にnを代入
+	}
+```
+- 修正後コード
+```go
+	out := make(map[string]map[string]int, len(input))
+	for key, vals := range m { // key:日付　vals:レベルのスライス // 注意：map mからforで取り出しているので、並び順が保証されていない。 -> ソートが必要
+		n := make(map[string]int, len(input)) // 修正：初期化する
+		for _, v := range vals {
+			if _, ok := n[v]; ok { // もし、nの中にLevelがあったら、出現回数をカウントアップ
+				n[v]++
+				continue // 修正：ここを忘れると、ifの後のn[v]=1が実行されて、レベルのカウントが毎回1になる...
+			}
+			// もしなかったら、キー(レベル)と初期値を加える
+			n[v] = 1 // 初期値
+		}
+		out[key] = n // キーを日付として、値にnを代入
+	}
+```
+- バグ理由①：`for key, vals`ごとに、つまり`key`ごとに変数`n`を初期化しないと、`key`を跨いでレベルをカウントしてしまう。 
+- バグ理由②：`continue`がないと、レベルをカウントしてから、`n[v]= 1`が実行されてしまい、レベルのカウントが全て1になる。
+#### レビュー修正（わかったこと）
+1. *`map`にキーと値を代入する時に、キーが存在するかどうかはいらない。**
+- 冗長なコード
+```go
+for _, v := range vals {
+    if _, ok := n[v]; ok { // もし、nの中にLevelがあったら、出現回数をカウントアップ
+        n[v]++
+        continue // 忘れずに
+    }
+    // もしなかったら、キー(レベル)と初期値を加える
+    n[v] = 1 // 初期値
+}
+```
+- 正しいコード
+```go
+for _, v := range vals {
+    n[v]++
+}
+```
+2. `if _, ok := m[e]; !ok { ... } `は存在判定が目的の時のみ使う。 -> キーの出現回数をカウントする時には不要。
+3. コードの簡素化
+- 自分の実装
+```go
+m := make(map[string][]string, len(input)) // 第1パス：日付ごとにレベルを "スライスに溜める"（＝05 の group_by）
+for _, s := range input {
+    m[s.Date] = append(m[s.Date], s.Level)
+}
+out := make(map[string]map[string]int, len(input)) // 第2パス：溜めたスライスを数える（＝04 の count）
+for key, vals := range m { ... }
+```
+- Claudeの実装
+```go
+func aggregateDateStatus(input []Status) map[string]map[string]int {
+    out := make(map[string]map[string]int, len(input))
+    for _, s := range input {
+        if out[s.Date] == nil {          // 内側 map は書き込む前に必ず初期化（下の注意）
+            out[s.Date] = make(map[string]int)
+        }
+        out[s.Date][s.Level]++           // 欠損レベルはゼロ値 0 → ++ で 1
+    }
+    return out
+}
+```
+- **`out[s.Date][s.Level]++`のように書くことで、`map`のネストした値にアクセスできる。** -> 初めて知った！！
+- **(重要)`map`の書き込みに対しては、必ず初期化しないと`nil`マップへの書き込みとなって`panic`になる。**
+  - ここでは、キー`Date`に対する値が`map`なので、必ず初期化する。
+#### 知識
+##### `Entry`（エントリ）とは
+- `entry` は「記入・項目・登録されたもの」という普通の英単語。ソフトウェアでは **「並んでいるデータの1件分」** を指すごく一般的な言葉。
+  - ログの1行 = a log **entry**
+  - 辞書の1項目 = a dictionary **entry**
+  - 名簿の1件 = an **entry**
+- 「たくさん並んでいるものの、そのうちの1つ」というニュアンス。
+- 今回の `Status` 構造体は「ログが何行もある中の**1行分**（日付＋レベル）」＝まさに **log entry（ログ1件）**。
+  - なので `Status`（状態）より `LogEntry`（ログ1件）のほうが「これは入力の1レコードだ」と正確に伝わる。
+- 似た用語の使い分け:
+
+| 語 | 意味 | 例 |
+|---|---|---|
+| **entry** | 並んだデータの1件（記入されたもの） | ログ1行、辞書の1項目 |
+| **record** | 1件のデータ（DB由来。ほぼ同義） | DBの1行、`LogRecord` |
+| **item** | 一覧・配列の1要素（もっと汎用） | リストの1個 |
+| **element** | 集合・配列の1要素（数学寄り） | `04` の `CountElement` |
+
+- `LogEntry` でも `LogRecord` でも意味はほぼ同じ。Go／ログ処理の界隈では **`entry`** がよく使われる（標準ライブラリの `log` など）。
+- 補足: `map` の文脈では `entry` に**もう一つ**の意味がある —— 「mapの中の**キー＋値のペア1組**」も entry と呼ぶ（`for k, v := range m` で回している1組がそれ）。今回の改名案は前者（ログ1件）の意味。
+#### 反省
+- `Go`における`map`は順序を保証しないことは常に頭に入れておく。
+- **データ構造ごとの性質（何が得意で不得意か）理解したほうが良い**かも。
+  - 例１：`map`はキーが重複しないので、要素の存在の判断に使える。また、要素の数をカウントできる。等
+  - 例２：`slice`は、並びを保証しやすい。ソートしやすいデータ。等
+#### 実装時間
+- 合計：3時間54分
+  - 初期実装：3時間
+  - 修正：54分
+---
