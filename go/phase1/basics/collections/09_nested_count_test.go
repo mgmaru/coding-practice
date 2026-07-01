@@ -8,17 +8,17 @@ import (
 func TestAggregateDateStatus(t *testing.T) {
 	cases := []struct {
 		name  string
-		input []Status
+		input []logEntry
 		want  map[string]map[string]int
 	}{
-		// 構造体StatusのDateとLevelは共にstring型なので、nilは入らない。
-		{name: "normal", input: []Status{{Date: "06-01", Level: "INFO"}, {Date: "06-01", Level: "ERROR"}, {Date: "06-01", Level: "INFO"}, {Date: "06-02", Level: "INFO"}}, want: map[string]map[string]int{"06-01": {"INFO": 2, "ERROR": 1}, "06-02": {"INFO": 1}}},
-		{name: "EmptyInput", input: []Status{}, want: map[string]map[string]int{}},
+		// 構造体logEntryのDateとLevelは共にstring型なので、nilは入らない。
+		{name: "normal", input: []logEntry{{date: "06-01", level: "INFO"}, {date: "06-01", level: "ERROR"}, {date: "06-01", level: "INFO"}, {date: "06-02", level: "INFO"}}, want: map[string]map[string]int{"06-01": {"INFO": 2, "ERROR": 1}, "06-02": {"INFO": 1}}},
+		{name: "EmptyInput", input: []logEntry{}, want: map[string]map[string]int{}},
 		{name: "NilInput", input: nil, want: map[string]map[string]int{}},
-		{name: "MissingDate(EmptyString)", input: []Status{{Date: "06-01", Level: "INFO"}, {Date: "", Level: "ERROR"}, {Date: "06-02", Level: "INFO"}}, want: map[string]map[string]int{"06-01": {"INFO": 1}, "06-02": {"INFO": 1}, "": {"ERROR": 1}}},
-		{name: "MissingAllDate(EmptyString)", input: []Status{{Date: "", Level: "INFO"}, {Date: "", Level: "ERROR"}, {Date: "", Level: "INFO"}}, want: map[string]map[string]int{"": {"INFO": 2, "ERROR": 1}}},
-		{name: "MissingLevel(EmptyString)", input: []Status{{Date: "06-01", Level: ""}, {Date: "06-01", Level: "ERROR"}, {Date: "06-02", Level: "INFO"}}, want: map[string]map[string]int{"06-01": {"ERROR": 1, "": 1}, "06-02": {"INFO": 1}}},
-		{name: "MissingAlLevel(EmptyString)", input: []Status{{Date: "06-01", Level: ""}, {Date: "06-01", Level: ""}, {Date: "06-02", Level: ""}}, want: map[string]map[string]int{"06-01": {"": 2}, "06-02": {"": 1}}},
+		{name: "MissingDate(EmptyString)", input: []logEntry{{date: "06-01", level: "INFO"}, {date: "", level: "ERROR"}, {date: "06-02", level: "INFO"}}, want: map[string]map[string]int{"06-01": {"INFO": 1}, "06-02": {"INFO": 1}, "": {"ERROR": 1}}},
+		{name: "MissingAllDate(EmptyString)", input: []logEntry{{date: "", level: "INFO"}, {date: "", level: "ERROR"}, {date: "", level: "INFO"}}, want: map[string]map[string]int{"": {"INFO": 2, "ERROR": 1}}},
+		{name: "MissingLevel(EmptyString)", input: []logEntry{{date: "06-01", level: ""}, {date: "06-01", level: "ERROR"}, {date: "06-02", level: "INFO"}}, want: map[string]map[string]int{"06-01": {"ERROR": 1, "": 1}, "06-02": {"INFO": 1}}},
+		{name: "MissingAllLevel(EmptyString)", input: []logEntry{{date: "06-01", level: ""}, {date: "06-01", level: ""}, {date: "06-02", level: ""}}, want: map[string]map[string]int{"06-01": {"": 2}, "06-02": {"": 1}}},
 	}
 
 	for _, c := range cases {
