@@ -313,3 +313,48 @@ func aggregateDateStatus(input []Status) map[string]map[string]int {
   - 初期実装：3時間
   - 修正：54分
 ---
+### 2026/7/10
+#### やったこと
+- 10_flatten.go実装
+- 10_flatten_test.go実装
+#### わかったこと
+- リストの展開`...`を使用することで、`for`で要素を１つずつ取り出して`append`しなくても、１発で`append`できる。
+1. 自分の実装
+```go
+for _, numList := range input {
+		for _, num := range numList { // numListが空の場合、appendは実行されない
+			oneDimList = append(oneDimList, num)
+		}
+	}
+```
+2. 展開`...`を使用した実装
+```go
+for _, numList := range input {
+	oneDimList = append(oneDimList, numList...)
+	}
+```
+- 平滑化後の容量の設定
+1. 最初の自分の実装では、平滑後のリストの容量を指定していなかった。
+```go
+func smoothTheList(input [][]int) []int {
+	oneDimList := make([]int, 0) // capはlen(input)では足りない ←容量指定なし
+	for _, numList := range input {
+			oneDimList = append(oneDimList, numList...)
+```
+2. しかし、冷静に考えると、平滑化後のリストの最大サイズは計算できる。
+```go
+func flattenList(input [][]int) []int {
+	// 修正：平滑化後のスライスのサイズを計算 ←ここ！
+	maxFlattenListSize := 0
+	for _, l := range input {
+		maxFlattenListSize += len(l)
+	}
+	oneDimList := make([]int, 0, maxFlattenListSize) // capはlen(input)では足りない -> 修正：最初に平滑化後のリストを計算して、capに指定
+	for _, numList := range input {
+		oneDimList = append(oneDimList, numList...) // 修正：リストを展開してappend
+	}
+```
+- 容量を設定することで、無駄な容量を確保しなくてよくなり、メモリを効率的に使用できる。
+#### 実装時間
+- 合計：1時間30分
+---

@@ -2,13 +2,18 @@ package collections
 
 // var input = [][]int{{1, 2}, {3}, {4, 5, 6}} // []intにnilが入ってくる場合があることに注意
 
-func smoothTheList(input [][]int) []int {
-	oneDimList := make([]int, 0) // capはlen(input)では足りない
+func flattenList(input [][]int) []int {
+
+	// 修正：平滑化後のスライスのサイズを計算
+	maxFlattenListSize := 0
+	for _, l := range input {
+		maxFlattenListSize += len(l)
+	}
+
+	oneDimList := make([]int, 0, maxFlattenListSize) // capはlen(input)では足りない -> 修正：最初に平滑化後のリストを計算して、capに指定
 
 	for _, numList := range input {
-		for _, num := range numList { // numListが空の場合、appendは実行されない
-			oneDimList = append(oneDimList, num)
-		}
+		oneDimList = append(oneDimList, numList...) // 修正：リストを展開してappend
 	}
 	return oneDimList
 }

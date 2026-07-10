@@ -224,3 +224,53 @@ oneDimList := make([]int, 0)   // ← 非 nil の空スライス
 > 総括: `10` はバグ無し・緑も信用してよい回。`09` と同じく**残課題は "設計の二択" ではなく "道具の畳み込み"**――内側ループを `append(dst, numList...)` の**flatten イディオム一撃**に落とせるか、が芯。
 > そして観点1 の「**走査源が slice だから `sort` が要らない**」を、`04`（map 走査で要 `sort`）・`09`（map 出力で順序非依存）と**三点で切り分けて**言語化できれば、Tier 3 の「順序」スレッドは完全に手の内に入る。
 > レビューの主眼は欠陥探しではなく、**"なぜこの緑は決定的なのか" を三つ目の理由で説明でき、flatten のイディオムを一つ増やせること**。そこが言えれば `10` は道具の再利用で軽く越えられる。
+
+---
+
+# 再レビュー記録 — A項目 全クローズ
+
+チェックリスト **A（コードを直す）をすべて消化**した修正の再レビュー。
+`go test -run TestFlattenList -count=5` は **8 サブテスト × 5 回連続で緑**、`gofmt` 差分なし・`go vet` クリーン。**バグ無し・全観点クローズ**。
+
+## 修正内容と結果
+
+| 観点 | 修正 | 状態 |
+|---|---|---|
+| 観点2 | 内側ループを **`append(oneDimList, numList...)` 一撃**に畳んだ（`10_flatten.go:16`）。flatten のイディオムに到達 | ✅ |
+| 観点3 | 事前パスで `Σ len(内側)` を数え **`make([]int, 0, maxFlattenListSize)`** にぴったり確保（`:8-13`）。`append` の再確保が消えた | ✅ |
+| 観点4-2 | 関数名 `smoothTheList` → **`flattenList`**。テスト（`TestFlattenList`・呼び出し）も足並みを揃えた | ✅ |
+| 観点4-3 | **`EmptyInput`（`[][]int{}`）** と **`NilInput`（`nil`）** の2ケースを追加（`test:21-22`）。外側の空/nil の穴が閉じた | ✅ |
+| 命名（極軽微） | 中間変数を **`maxFlattenListSize`（camelCase）** に。Go 慣用に整合 | ✅ |
+
+## 光った点 ―― "cap では足りない" の気づきを、次の一手まで倒し切った
+
+```go
+maxFlattenListSize := 0
+for _, l := range input {
+	maxFlattenListSize += len(l)      // ← 欲しいのは len(input) ではなく Σ len(内側)
+}
+oneDimList := make([]int, 0, maxFlattenListSize)
+for _, numList := range input {
+	oneDimList = append(oneDimList, numList...)   // ← flatten のイディオム。空/nil も分岐なしで吸収
+}
+return oneDimList
+```
+
+- `04` で覚えた容量ヒントを、flatten では **`len(input)` ではなく `Σ len(内側)`** と正しく見積もれた。`append` の途中拡張がゼロになる。
+- 内側ループが `slice...` 一撃に。**空/nil の内側は 0 要素として黙って吸収**され、`ContainsEmptyElement`/`AllNilElements` 等が分岐なしで緑。
+- `make([]int, 0, ...)`（非 nil）× `want []int{}` の握手も維持 ―― `01` の「非 nil の空を返す」一貫性が **load-bearing** のまま守られている（`var s []int` に退化していない）。
+
+## 最終ステータス（確定）
+
+| 観点 | 内容 | 状態 |
+|---|---|---|
+| 1 | スライス出力なのに `sort` 不要 ―― 走査源が slice だから（`04`/`09` と三点で切り分け） | ✅（理解確認 B項目） |
+| 2 | 内側ループ → `append(dst, numList...)` 一撃（flatten のイディオム） | ✅ |
+| 3 | 容量ヒントを `Σ len(内側)` で右サイズ化。再確保ゼロ | ✅ |
+| 4 | 命名 `flattenList`・camelCase 化・外側空/nil のテスト追加・非nil空の一貫性 | ✅ |
+
+- `go test -run TestFlattenList -count=5 ./phase1/basics/collections`：**8 サブテスト × 5 回連続 PASS**。
+- `gofmt` 差分なし・`go vet` クリーン。
+
+> 総括: **A項目 全クローズ。コードは正しく、緑も信用してよい**。`04` の容量ヒント／`05` の `append`／`01` の「非 nil の空」を**合成して、flatten を1本の素直なループに畳めた**のが今回の芯。
+> 残課題なし ―― Tier 3 の2発目、完了。次は `11_inner_join`（2リストをキーで突き合わせる＝`03` intersection ＋ `07` lookup の合成）へ。
