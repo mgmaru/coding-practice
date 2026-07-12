@@ -122,11 +122,11 @@ func parseCommnads() (*Commands, error) {
 	}
 
 	// 空ディレクトリか
-	empty, err := isEmptyDir(inputPath)
+	isEmpty, err := isEmptyDir(inputPath)
 	if err != nil {
 		return nil, err
 	}
-	if empty {
+	if isEmpty {
 		return nil, errors.New("空ディレクトリです。")
 	}
 
@@ -256,7 +256,7 @@ func makeExtPathPlan(targetDir string, extFilesMove []ExtFileMove) []FilePathMov
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
 		}
 		if file.Extension == "" { // no extension
-			planPath := targetDir + "/" + file.FileInfo.FileBaseInfo.FileName + "/" + file.FileInfo.FileBaseInfo.FileName
+			planPath := targetDir + "/" + "noext" + "/" + file.FileInfo.FileBaseInfo.FileName
 			extFilePathMove = append(extFilePathMove, FilePathMove{BeforePath: file.FileInfo.FileBaseInfo.FilePath, AfterPath: planPath})
 		}
 		// その他の拡張子があれば追加していく
