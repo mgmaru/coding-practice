@@ -699,7 +699,11 @@ func main() {
 				fmt.Println("ファイルの変更はありません。")
 				return
 			}
+
 			// 冪等でなければ、planPathがそのまま決定計画となる。
+			// 以下追記：2026/7/12
+			// ただし、「planPathがそのまま決定計画」について注意が必要。これは実行時に一時リネームによって、上書きを防ぐ前提だからこそ成り立つ。
+			// seqコマンドは、衝突は起こらないが上書きは起こる。これは別のものとして考えた方が良さそう。
 			renameFileSummary := summaryFilesRenamePlan(planPath)
 			displayFilesRenamePlan(renameFileSummary)
 
