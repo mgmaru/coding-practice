@@ -89,11 +89,11 @@ type ApplyedFilePath struct {
 
 // リネーム計画サマリ
 type RenamePlanSummary struct {
-	AllFiles      int // 全てのファイル数
-	CompleteFiles int // 完了する/した　ファイル数
-	// SkipFiles     int // スキップしたファイル数（衝突したファイル数）
-	ErrorFiles    int // エラーファイル数（衝突以外の何らかの理由でエラー）
-	UnchangeFiles int // 変更なしファイル
+	CompleteFiles     int // 完了する/した　ファイル数
+	SkipFiles         int // スキップしたファイル数（衝突したファイル数）
+	ErrorFiles        int // エラーファイル数（衝突以外の何らかの理由でエラー）
+	UnchangeFiles     int // 変更なしファイル
+	CannotChangeFiles int // エラーによって変更できないファイル数
 }
 
 // 実行結果サマリ
@@ -508,11 +508,11 @@ func hasPathConflict(filePathMove []FilePathMove) []FilePathHasConflict {
 
 // 衝突判定結果を終えたパスを移動前のファイルパスのファイル名を見てソートする関数（ext / date） -> ファイル操作の実行順番で返す
 // hasConflictはファイルの実行順を保証しないので、最後にソートする。
-func sortAscrFileAfterConflictDet(filesPathHasConflict []FilePathHasConflict) []FilePathHasConflict {
-	sort.Slice(filesPathHasConflict, func(i, j int) bool {
-		return filepath.Base(filesPathHasConflict[i].FilePathMove.BeforePath) > filepath.Base(filesPathHasConflict[j].FilePathMove.BeforePath) // ファイル名でソート
+func sortFilesNameAcend(planedFilesPath []PlanedFilePath) []PlanedFilePath {
+	sort.Slice(planedFilesPath, func(i, j int) bool {
+		return filepath.Base(planedFilesPath[i].FilePath.BeforePath) < filepath.Base(planedFilesPath[j].FilePath.BeforePath) // ファイル名でソート
 	})
-	return filesPathHasConflict
+	return planedFilesPath
 }
 
 // 予定を受け取って結果を返す関数
@@ -594,13 +594,14 @@ func summaryFilesMovePlan(hasPathConflict []FilePathHasConflict, conflict string
 }
 
 // リネーム計画を受け取ってサマリを返す関数
-func summaryFilesRenamePlan(planPath []FilePathMove) RenamePlanSummary {
-	var completeFilesCount int
-	// var skipFilesCount int
-	// var errorFilesCount int
-	var unchangeFilesCount int
+func summaryFilesRenamePlan(planPath []FilePathMove) ([]PlanedFilePath, RenamePlanSummary) {
+	var completeFilesCount int     // 必要
+	var skipFilesCount int         // 不要？ 理由：衝突は起きないから（一時リネームを導入するため）
+	var errorFilesCount int        // 不要？　理由：衝突は起きないから（一時リネームを導入するため）
+	var unchangeFilesCount int     // 必要
+	var cannotChangeFilesCount int //　不要？　理由：衝突によるエラーは起こらないため（一時リネームを導入するため）
 
-	allFilesCount := len(planPath)
+	planedFilePath := make([]PlanedFilePath, 0, len(planPath))
 
 	for _, path := range planPath {
 		if path.BeforePath == path.AfterPath {
@@ -609,7 +610,7 @@ func summaryFilesRenamePlan(planPath []FilePathMove) RenamePlanSummary {
 		}
 		completeFilesCount++
 	}
-	return RenamePlanSummary{AllFiles: allFilesCount, CompleteFiles: completeFilesCount, UnchangeFiles: unchangeFilesCount}
+	return planedFilePath, RenamePlanSummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
 }
 
 // ファイル操作のサマリを受け取って計画を表示する関数（ext, date）
@@ -691,11 +692,11 @@ func main() {
 			}
 
 			planPath := hasPathConflict(filePathMove)
-			sortPathPlan := sortAscrFileAfterConflictDet(planPath)
-			planedFilePath, planedSummary := summaryFilesMovePlan(sortPathPlan, commands.Conflict)
+			planedFilesPath, planedSummary := summaryFilesMovePlan(planPath, commands.Conflict)
+			sortPlanedFilesPath := sortFilesNameAcend(planedFilesPath)
 			displayFilesMovePlan(planedSummary) // サマリーを表示
 
-			fmt.Println(planedFilePath)
+			fmt.Println(sortPlanedFilesPath)
 		}
 
 		// date
@@ -715,11 +716,11 @@ func main() {
 			}
 
 			planPath := hasPathConflict(filePathMove)
-			sortPathPlan := sortAscrFileAfterConflictDet(planPath)
-			planedFilePath, planedSummary := summaryFilesMovePlan(sortPathPlan, commands.Conflict)
+			planedFilesPath, planedSummary := summaryFilesMovePlan(planPath, commands.Conflict)
+			sortPlanedFilesPath := sortFilesNameAcend(planedFilesPath)
 			displayFilesMovePlan(planedSummary) // サマリーを表示
 
-			fmt.Println(planedFilePath)
+			fmt.Println(sortPlanedFilesPath)
 		}
 
 		// seq
@@ -738,10 +739,11 @@ func main() {
 			// 以下追記：2026/7/12
 			// ただし、「planPathがそのまま決定計画」について注意が必要。これは実行時に一時リネームによって、上書きを防ぐ前提だからこそ成り立つ。
 			// seqコマンドは、衝突は起こらないが上書きは起こる。これは別のものとして考えた方が良さそう。
-			renameFileSummary := summaryFilesRenamePlan(planPath)
+			planedFilesPath, renameFileSummary := summaryFilesRenamePlan(planPath)
 			displayFilesRenamePlan(renameFileSummary)
+			sortPlanedFilesPath := sortFilesNameAcend(planedFilesPath)
 
-			fmt.Println(planPath)
+			fmt.Println(sortPlanedFilesPath)
 		}
 
 		// ユーザ入力
