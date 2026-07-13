@@ -595,22 +595,24 @@ func summaryFilesMovePlan(hasPathConflict []FilePathHasConflict, conflict string
 
 // リネーム計画を受け取ってサマリを返す関数
 func summaryFilesRenamePlan(planPath []FilePathMove) ([]PlanedFilePath, RenamePlanSummary) {
-	var completeFilesCount int     // 必要
-	var skipFilesCount int         // 不要？ 理由：衝突は起きないから（一時リネームを導入するため）
-	var errorFilesCount int        // 不要？　理由：衝突は起きないから（一時リネームを導入するため）
-	var unchangeFilesCount int     // 必要
-	var cannotChangeFilesCount int //　不要？　理由：衝突によるエラーは起こらないため（一時リネームを導入するため）
+	var completeFilesCount int         // 必要
+	var skipFilesCount int = 0         // 不要？ 理由：衝突は起きないから（一時リネームを導入するため）
+	var errorFilesCount int = 0        // 不要？　理由：衝突は起きないから（一時リネームを導入するため）
+	var unchangeFilesCount int         // 必要
+	var cannotChangeFilesCount int = 0 //　不要？　理由：衝突によるエラーは起こらないため（一時リネームを導入するため）
 
-	planedFilePath := make([]PlanedFilePath, 0, len(planPath))
+	planedFilesPath := make([]PlanedFilePath, 0, len(planPath))
 
 	for _, path := range planPath {
 		if path.BeforePath == path.AfterPath {
+			planedFilesPath = append(planedFilesPath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.BeforePath, AfterPath: path.AfterPath}, Status: UnchangeFileStatus})
 			unchangeFilesCount++
 			continue
 		}
+		planedFilesPath = append(planedFilesPath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.BeforePath, AfterPath: path.AfterPath}, Status: CompleteFileStatus})
 		completeFilesCount++
 	}
-	return planedFilePath, RenamePlanSummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
+	return planedFilesPath, RenamePlanSummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
 }
 
 // ファイル操作のサマリを受け取って計画を表示する関数（ext, date）
