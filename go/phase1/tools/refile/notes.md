@@ -283,7 +283,74 @@ for _, file := range fileBaseInfo {
 }
 ```
 ---
-## リファクタリング（初回実装ご後）
+### 2026-07-14
+#### やったこと
+- 関数`summaryFilesMovePlan`修正
+    - この中でPlanedFilePathにファイルパスを詰めていく処理を追加
+    - 返り値に[]PlanedFilePathを追加
+- 関数`summaryFilesRenamePlan`修正
+    - この中でPlanedFilePathにファイルパスを詰めていく処理を追加
+    - 返り値に[]PlanedFilePathを追加
+- 計画決定後に一括ソートするように処理を修正
+    - 関数`sortAscrFileAfterConflictDet`を関数`sortFilesNameAcend`に変更。
+    - 引数を`[]PlanedFilePath`として、`ext`、`date`、`seq`コマンド共通で使用できるようにした（汎用的なものにした）。
+#### わかったこと
+- 関数`sortAscrFileAfterConflictDet`を汎用的にしたかった。
+  - 最初、ジェネリクスで実装しようとしたが、うまくいかなかった。
+1. 自分の実装
+```go
+type sortFile interface{
+			FilePathMove
+}
+func sortFilesNameAcend[T sortFile](planedFilesPath []T) []T{
+	sort.Slice(planedFilesPath, func(i, j int) bool {
+		return filepath.Base(planedFilesPath[i].FilePath.BeforePath) < filepath.Base(planedFilesPath[j].FilePath.BeforePath) // ファイル名でソート
+	})
+	return planedFilesPath
+}
+```
+- 最初、このように実装したが、関数の中で`sortFile`の中の`FilePathMove`のフィールドにアクセスしようとしたが、これができなかった。。。
+- 自分のイメージでは、`sortFilesNameAcend`にはなんでも渡せるようにはしたくなかったので、`FilePathMove`をフィールドにもつ型のみを入力して使用できるように制限したかった。
+- しかし、**Goでは、制約にフィールドを要求する構文が存在しない**。 -> **structural constraints の欠落**
+2. 解決策：メソッドで要求する
+```go
+type HasFilePathMove interface {
+	GetFilePathMove() FilePathMove
+}
+
+func sortFilesNameAsc[T HasFilePathMove](xs []T) {
+	slices.SortFunc(xs, func(a, b T) int {
+		return cmp.Compare(
+			filepath.Base(a.GetFilePathMove().BeforePath),
+			filepath.Base(b.GetFilePathMove().BeforePath),
+		)
+	})
+}
+```
+```go
+func (p PlannedFile) GetFilePathMove() FilePathMove { return p.FilePathMove }
+func (c ConflictItem) GetFilePathMove() FilePathMove { return c.FilePathMove }
+```
+- このように実装すれば、`PlannedFile`および`ConflictItem`が関数`GetFilePathMove`を持っているので、関数`sortFilesNameAsc`を使用できる。これだったら、自分の意図を実現できる。
+3. 埋め込みによる実装
+```go
+type FilePathMove struct {
+	BeforePath string
+	AfterPath  string
+}
+
+func (f FilePathMove) GetFilePathMove() FilePathMove { return f }
+
+type PlannedFile struct {
+	FilePathMove  // 埋め込み 
+	Status string
+}
+// PlannedFile は自動的に GetFilePathMove() を持つ
+// FilePathMoveがメソッドGetFilePathMoveを持つので、PlannedFileもGetFilePathMoveを持つ。-> PlannedFileもsortFilesNameAscを使用することができる。
+```
+- これを**昇格（promotion）**と言う。　-> これはGo言語特有のもの。
+---
+## リファクタリング（初回実装後）
 ### 工夫した点
 
 ### わからなかった点
