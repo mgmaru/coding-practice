@@ -75,6 +75,18 @@ type PlanSummary struct {
 	CannotChangeFiles int // エラーによって変更できないファイル数
 }
 
+// 最終的な計画サマリ
+type PlanedFilePath struct {
+	FilePath FilePathMove
+	Status   FileStatus
+}
+
+// 実行後のサマリ
+type ApplyedFilePath struct {
+	FilePath FilePathMove
+	Status   FileStatus
+}
+
 // リネーム計画サマリ
 type RenamePlanSummary struct {
 	AllFiles      int // 全てのファイル数
@@ -92,6 +104,17 @@ type ResultSummary struct {
 	UnChangeFiles     int // 変更なしファイル
 	CannotChangeFiles int // エラーによって変更できないファイル数
 }
+
+type FileStatus string
+
+// 計画完了後、適用後のファイルステータス
+const (
+	CompleteFileStatus FileStatus = "complete"
+	SkipFileStatus     FileStatus = "skip"
+	ErrorFileStatus    FileStatus = "error"
+	UnchangeFileStatus FileStatus = "unchange"
+	CannotFileStatus   FileStatus = "cannot"
+)
 
 // コマンドをパースする関数：入力したコマンド形式が正しいかどうかを判定する。
 // コマンドが正しければ、コマンドとパスを返す。
@@ -137,7 +160,7 @@ func parseCommnads() (*Commands, error) {
 
 	// コマンドを返却
 	return &Commands{
-		Path:      args[0],
+		Path:      inputPath,
 		By:        *by,
 		Prefix:    *prefix,
 		Apply:     *apply,
@@ -384,7 +407,7 @@ func isIndempotent(filePathMove []FilePathMove) bool {
 	var pathMatchCount int // 移動前と移動後でマッチしたパスの回数をカウント
 
 	if len(filePathMove) == 0 { // 空スライス、nilを判定
-		return false
+		return true // 空スライスの場合も冪等（変更なし）としてカウント
 	}
 
 	for _, file := range filePathMove {
@@ -452,7 +475,6 @@ func hasPathConflict(filePathMove []FilePathMove) []FilePathHasConflict {
 
 	// 計画が決まっていないパス（remainingChangePath）どうしの衝突を判定する。
 	// 注意：重複appendは許さないようにする。
-
 	n := make(map[string]struct{}, len(remainingChangePathes)) // remainingChangePathesで計画が決まったもののBeforePathを格納
 
 	for _, i := range remainingChangePathes {
@@ -497,7 +519,10 @@ func sortAscrFileAfterConflictDet(filesPathHasConflict []FilePathHasConflict) []
 // --on-conflictに基づいて、衝突したものをスキップするかエラーとして操作を終了するのかを決めて、結果を返す。
 // 仕様：--on-conflict：skip -> 衝突しているファイルをスキップしてファイル操作を実行する。
 // 仕様：--on-conflict；error -> 衝突しているファイルを検出した時点で、ファイル操作を中断する。
-func summaryFilesMovePlan(hasPathConflict []FilePathHasConflict, conflict string) PlanSummary {
+// 2026-07-13追記：[]PlanedFilePathのファイル順序は保証しない
+// conflict skipの場合：スライスからファイルパスを取り出して衝突判定をしているので、順序が保証されている。
+// conflict errorの場合：cannotについて、マップからパスを取り出して[]PlanedFilePathにappendしているので、順序が保証されない
+func summaryFilesMovePlan(hasPathConflict []FilePathHasConflict, conflict string) ([]PlanedFilePath, PlanSummary) {
 
 	var completeFilesCount int     // ファイル操作できるファイル数
 	var skipFilesCount int         // 衝突のためにスキップしたファイル数
@@ -505,38 +530,66 @@ func summaryFilesMovePlan(hasPathConflict []FilePathHasConflict, conflict string
 	var unchangeFilesCount int     // パスの変更がないファイル数
 	var cannotChangeFilesCount int //エラーによって操作を中断したファイル数
 
+	planedFilePath := make([]PlanedFilePath, 0, len(hasPathConflict))
+
 	if conflict == "skip" {
 		for _, path := range hasPathConflict {
 			if path.HasConflict {
 				skipFilesCount++
+				planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.FilePathMove.BeforePath, AfterPath: path.FilePathMove.BeforePath}, Status: SkipFileStatus})
 				continue // スキップ
 			}
 			if path.FilePathMove.BeforePath == path.FilePathMove.AfterPath {
+				planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.FilePathMove.BeforePath, AfterPath: path.FilePathMove.AfterPath}, Status: UnchangeFileStatus})
 				unchangeFilesCount++
 				continue // スキップ
 			}
 			// 衝突していない場合、実行できるファイルパス
+			planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.FilePathMove.BeforePath, AfterPath: path.FilePathMove.AfterPath}, Status: CompleteFileStatus})
 			completeFilesCount++
 		}
-		return PlanSummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
+		return planedFilePath, PlanSummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
 
 	} else { // error（default）
+
+		// まだ計画が決定していないファイルパス（FilePathMove）をキー、値を空の構造体として格納する。
+		// 計画が決定したファイルはマップから削除する。
+		// 最後まで残っているファイルはcannotとして計画を決定する
+		m := make(map[FilePathMove]struct{}, len(hasPathConflict))
+
+		// mapにファイルを格納
+		for _, fileMovePath := range hasPathConflict {
+			m[fileMovePath.FilePathMove] = struct{}{}
+		}
+
 		for _, path := range hasPathConflict {
 			if path.HasConflict {
+				planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.FilePathMove.BeforePath, AfterPath: path.FilePathMove.BeforePath}, Status: ErrorFileStatus})
 				errorFilesCount++
+				delete(m, path.FilePathMove)
 				break // 衝突ファイルを検知した時点で操作をやめる
 			}
 			if path.FilePathMove.BeforePath == path.FilePathMove.AfterPath { // パスの変更がないファイル
+				planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.FilePathMove.BeforePath, AfterPath: path.FilePathMove.BeforePath}, Status: UnchangeFileStatus})
 				unchangeFilesCount++
+				delete(m, path.FilePathMove)
 				continue
 			}
 			// 衝突していない場合、実行できるファイルパス
+			planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.FilePathMove.BeforePath, AfterPath: path.FilePathMove.AfterPath}, Status: CompleteFileStatus})
 			completeFilesCount++
+			delete(m, path.FilePathMove)
 		}
 
+		// もし、衝突していたら残りのファイルは全て変更できない
 		cannotChangeFilesCount = len(hasPathConflict) - completeFilesCount - errorFilesCount - unchangeFilesCount // エラーによって実行できないファイル数
+		// マップの中で残っているファイルをplanedFilePathに格納していく
+		// cannot（移動できない）ものとして決定
+		for path, _ := range m {
+			planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.BeforePath, AfterPath: path.BeforePath}, Status: CannotFileStatus})
+		}
 
-		return PlanSummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
+		return planedFilePath, PlanSummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
 	}
 }
 
@@ -594,39 +647,21 @@ func displayFilesRenamePlan(renamePlanSummary RenamePlanSummary) {
 }
 
 // 計画を実行するかしないかを表示して結果を返す関数
-func isApplyPlan() (bool, error) {
+func doApplyPlan() (bool, error) {
 
-	var carryOut string
+	var doApply string
 
 	fmt.Print("計画を実行しますか？ Y/n：")
-	_, err := fmt.Scan(&carryOut)
+	_, err := fmt.Scan(&doApply)
 	if err != nil {
 		// scan error
 		return false, err // 実行しない
 	}
 
-	if carryOut == "Y" {
+	if doApply == "Y" {
 		return true, nil //実行する
 	}
 	return false, nil // 実行しない
-}
-
-// 実行する関数
-func applyPlanAndaggregateResultSummary(byCommand string) ResultSummary {
-
-	if byCommand == "ext" { // ext
-		return ResultSummary{}
-	}
-	if byCommand == "date" { // date
-		return ResultSummary{}
-	}
-	// seq
-	return ResultSummary{}
-}
-
-// ファイル操作のサマリを受け取って、操作結果を表示する関数
-func displayFileOperationResult(resultSummary ResultSummary) {
-
 }
 
 func main() {
@@ -656,12 +691,11 @@ func main() {
 			}
 
 			planPath := hasPathConflict(filePathMove)
-			sortPlanPath := sortAscrFileAfterConflictDet(planPath)
-			fileOperationSummary := summaryFilesMovePlan(sortPlanPath, commands.Conflict)
-			displayFilesMovePlan(fileOperationSummary) // サマリーを表示
+			sortPathPlan := sortAscrFileAfterConflictDet(planPath)
+			planedFilePath, planedSummary := summaryFilesMovePlan(sortPathPlan, commands.Conflict)
+			displayFilesMovePlan(planedSummary) // サマリーを表示
 
-			fmt.Println(planPath)
-
+			fmt.Println(planedFilePath)
 		}
 
 		// date
@@ -682,10 +716,10 @@ func main() {
 
 			planPath := hasPathConflict(filePathMove)
 			sortPathPlan := sortAscrFileAfterConflictDet(planPath)
-			fileOperationSummary := summaryFilesMovePlan(sortPathPlan, commands.Conflict)
-			displayFilesMovePlan(fileOperationSummary) // サマリーを表示
+			planedFilePath, planedSummary := summaryFilesMovePlan(sortPathPlan, commands.Conflict)
+			displayFilesMovePlan(planedSummary) // サマリーを表示
 
-			fmt.Println(planPath)
+			fmt.Println(planedFilePath)
 		}
 
 		// seq
@@ -711,7 +745,7 @@ func main() {
 		}
 
 		// ユーザ入力
-		isApply, err := isApplyPlan()
+		isApply, err := doApplyPlan()
 		if err != nil {
 			// 実行しない
 			fmt.Println("scan error")
@@ -732,8 +766,6 @@ func main() {
 	} else {
 
 		// Aplly
-		resultSummary := applyPlanAndaggregateResultSummary(commands.By)
-		displayFileOperationResult(resultSummary)
 
 		return
 	}
