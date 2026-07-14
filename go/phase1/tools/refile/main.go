@@ -75,13 +75,13 @@ type PlanSummary struct {
 	CannotChangeFiles int // エラーによって変更できないファイル数
 }
 
-// 最終的な計画サマリ
+// 計画決定後のファイルパス
 type PlanedFilePath struct {
 	FilePath FilePathMove
 	Status   FileStatus
 }
 
-// 実行後のサマリ
+// 実行後のファイルパス
 type ApplyedFilePath struct {
 	FilePath FilePathMove
 	Status   FileStatus
@@ -97,7 +97,7 @@ type RenamePlanSummary struct {
 }
 
 // 実行結果サマリ
-type ResultSummary struct {
+type ApplySummary struct {
 	CompleteFiles     int // 完了する/した　ファイル数
 	SkipFiles         int // スキップしたファイル数
 	ErrorFiles        int // エラーファイル数
@@ -537,7 +537,7 @@ func summaryFilesMovePlan(hasPathConflict []FilePathHasConflict, conflict string
 			if path.HasConflict {
 				skipFilesCount++
 				planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.FilePathMove.BeforePath, AfterPath: path.FilePathMove.BeforePath}, Status: SkipFileStatus})
-				continue // スキップ
+				continue // スキップ　/
 			}
 			if path.FilePathMove.BeforePath == path.FilePathMove.AfterPath {
 				planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.FilePathMove.BeforePath, AfterPath: path.FilePathMove.AfterPath}, Status: UnchangeFileStatus})
@@ -581,12 +581,11 @@ func summaryFilesMovePlan(hasPathConflict []FilePathHasConflict, conflict string
 			delete(m, path.FilePathMove)
 		}
 
-		// もし、衝突していたら残りのファイルは全て変更できない
-		cannotChangeFilesCount = len(hasPathConflict) - completeFilesCount - errorFilesCount - unchangeFilesCount // エラーによって実行できないファイル数
 		// マップの中で残っているファイルをplanedFilePathに格納していく
 		// cannot（移動できない）ものとして決定
 		for path, _ := range m {
 			planedFilePath = append(planedFilePath, PlanedFilePath{FilePath: FilePathMove{BeforePath: path.BeforePath, AfterPath: path.BeforePath}, Status: CannotFileStatus})
+			unchangeFilesCount++
 		}
 
 		return planedFilePath, PlanSummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnchangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
@@ -666,6 +665,135 @@ func doApplyPlan() (bool, error) {
 	}
 	return false, nil // 実行しない
 }
+
+// ディレクトリを作成する関数
+func makeDir(dirName string) error {
+	err := os.Mkdir(dirName, 0755)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Do ext, date
+// ソート済みのファイルパスを受け取ってファイル移動を実行する
+// 移動後のパスと適用結果を返す
+func doApplyFilesMove(planedFilesPath []PlanedFilePath, conflict string) ([]ApplyedFilePath, ApplySummary) {
+
+	var completeFilesCount int
+	var skipFilesCount int
+	var errorFilesCount int
+	var unchangeFilesCount int
+	var cannotChangeFilesCount int
+
+	if conflict == "skip" {
+
+		applyedFilesPath := make([]ApplyedFilePath, 0, len(planedFilesPath))
+
+		for _, file := range planedFilesPath {
+
+			oldPath := file.FilePath.BeforePath
+			newPath := file.FilePath.AfterPath
+
+			// 計画の時点で変更のないもの、スキップのものは適用対象にしない。
+			if file.Status == UnchangeFileStatus {
+				applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: oldPath, AfterPath: newPath}, Status: UnchangeFileStatus})
+				unchangeFilesCount++
+				continue
+			}
+			if file.Status == SkipFileStatus { // 計画段階で衝突しているのでスキップ
+				applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: oldPath, AfterPath: newPath}, Status: SkipFileStatus})
+				skipFilesCount++
+				continue
+			}
+			// file.Status == completeのものだけ適用範囲とする
+			// newPathからディレクトリパスを抽出（ファイル名はなし）
+			dirPath := filepath.Dir(newPath)
+
+			// ディレクトリ存在確認 なければ作成。あれば移動実行
+			isExistDir, _ := isExistingDir(dirPath)
+			if !isExistDir { // ディレクトリがなかったら作成する
+				makeDir(dirPath)
+			}
+			// ファイル移動実行
+			err := os.Rename(oldPath, newPath)
+			if err != nil { // 移動が失敗した場合、Skipとしてカウント。
+				applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: oldPath, AfterPath: oldPath}, Status: ErrorFileStatus})
+				errorFilesCount++
+				continue //エラーが出ても、次のファイルの処理に移る
+			}
+			// 成功したらCompleteとしてカウント
+			applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: oldPath, AfterPath: newPath}, Status: CompleteFileStatus})
+			completeFilesCount++
+		}
+
+		return applyedFilesPath, ApplySummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnChangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
+
+	} else { // conflict == error
+
+		applyedFilesPath := make([]ApplyedFilePath, 0, len(planedFilesPath))
+		m := make(map[PlanedFilePath]struct{}, len(planedFilesPath)) // 適用が終わっていないものを格納　// mapのキーには構造体に構造体が埋め込まれているものであれば設定できる。
+
+		// mapにファイルを格納
+		for _, planedFilePath := range planedFilesPath {
+			m[planedFilePath] = struct{}{}
+		}
+
+		for _, file := range planedFilesPath {
+
+			oldPath := file.FilePath.BeforePath
+			newPath := file.FilePath.AfterPath
+
+			// 計画の時点で変更のないもの、スキップのものは適用対象にしない。
+			if file.Status == UnchangeFileStatus {
+				applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: oldPath, AfterPath: newPath}, Status: UnchangeFileStatus})
+				unchangeFilesCount++
+				delete(m, file) // 適用外なのでマップから削除
+				continue
+			}
+			if file.Status == SkipFileStatus { // 計画段階で衝突しているのでスキップ
+				applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: oldPath, AfterPath: newPath}, Status: SkipFileStatus})
+				skipFilesCount++
+				delete(m, file)
+				continue
+			}
+
+			// file.Status == completeのものだけ適用範囲とする
+			dirPath := filepath.Dir(newPath)
+			isExistDir, _ := isExistingDir(dirPath)
+			if !isExistDir { // ディレクトリがなかったら作成する
+				makeDir(dirPath)
+			}
+			err := os.Rename(oldPath, newPath)
+			if err != nil { // エラーの場合は処理を中断 errorとしてカウント
+				applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: oldPath, AfterPath: oldPath}, Status: ErrorFileStatus}) //errorの場合、AfterPathはoldPathのまま
+				errorFilesCount++
+				delete(m, file)
+				break // エラーが発生した時点で、それ以降のファイルの処理を中断する（skipとの違う）
+			}
+			// errorじゃなければcomplete
+			applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: oldPath, AfterPath: newPath}, Status: CompleteFileStatus})
+			completeFilesCount++
+			delete(m, file)
+		}
+		// errorによってcannotになったものをカウントする。
+		// マップmの中に残っているファイルがcannot
+		for file, _ := range m {
+			applyedFilesPath = append(applyedFilesPath, ApplyedFilePath{FilePath: FilePathMove{BeforePath: file.FilePath.BeforePath, AfterPath: file.FilePath.BeforePath}, Status: CannotFileStatus}) // cannotなので、AfterPathはBeforeパスと同じ
+			unchangeFilesCount++
+		}
+		return applyedFilesPath, ApplySummary{CompleteFiles: completeFilesCount, SkipFiles: skipFilesCount, ErrorFiles: errorFilesCount, UnChangeFiles: unchangeFilesCount, CannotChangeFiles: cannotChangeFilesCount}
+	}
+}
+
+// Do seq
+// ソート済みのファイルパスを受け取ってファイルリネームを実行する
+// リネーム後のパスと適用結果を返す
+// func doApplyFilesRename(planedFilesPath []PlanedFilePath) ([]ApplyedFilePath, ApplySummary) {
+// 	// 一時的にリネームする
+// 	// ソートした
+// 	return
+// }
 
 func main() {
 
