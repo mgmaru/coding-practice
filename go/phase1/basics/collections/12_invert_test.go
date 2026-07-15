@@ -13,10 +13,13 @@ func TestInvertKeyValue(t *testing.T) {
 	}{
 		{name: "NotDuplicatedValue", input: map[string]int{"a": 1, "b": 2, "c": 3}, want: map[int][]string{1: {"a"}, 2: {"b"}, 3: {"c"}}},
 		{name: "DuplicatedValue", input: map[string]int{"a": 1, "b": 2, "c": 1}, want: map[int][]string{1: {"a", "c"}, 2: {"b"}}},
-		{name: "IncludedEnptykey", input: map[string]int{"": 1, "a": 2, "b": 3}, want: map[int][]string{1: {""}, 2: {"a"}, 3: {"b"}}},
+		{name: "IncludedEmptykey", input: map[string]int{"": 1, "a": 2, "b": 3}, want: map[int][]string{1: {""}, 2: {"a"}, 3: {"b"}}},
 		{name: "AllDuplicatedValues", input: map[string]int{"a": 1, "b": 1, "c": 1}, want: map[int][]string{1: {"a", "b", "c"}}},
 		{name: "IncludedUpperCaseKey", input: map[string]int{"a": 1, "b": 2, "A": 1}, want: map[int][]string{1: {"A", "a"}, 2: {"b"}}},
-		{name: "IncluededUpperCaseKeyAndEmptyKey", input: map[string]int{"a": 1, "A": 1, "b": 2, "": 1}, want: map[int][]string{1: {"", "A", "a"}, 2: {"b"}}},
+		{name: "IncludedUpperCaseKeyAndEmptyKey", input: map[string]int{"a": 1, "A": 1, "b": 2, "": 1}, want: map[int][]string{1: {"", "A", "a"}, 2: {"b"}}},
+		// 修正：テストケース追加
+		{name: "NilInput", input: nil, want: map[int][]string{}},
+		{name: "EmptyInput", input: map[string]int{}, want: map[int][]string{}},
 	}
 
 	for _, c := range cases {
