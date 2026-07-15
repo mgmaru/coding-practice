@@ -361,9 +361,47 @@ func flattenList(input [][]int) []int {
 ### 2026/7/11
 #### やったこと
 - 11_inner_join.go実装
-- 111_inner_join_test.go実装
+- 11_inner_join_test.go実装
 #### 間違えたところ
 - スライスの容量の見積もりを誤った。
 #### 実装時間
 - 合計：1時間27分
+---
+### 2026/7/15
+#### やったこと
+- 12_invert.go実装
+- 12_inver_test.go実装
+#### わかったこと
+- 今回、私の実装では、`[]string`の要素に対して`sort.SliceStable`を使用してソートした。
+  - しかし、これは過剰だという指摘を受けた。
+  - 考えてみると、今回はそもそも1つの要素だけを比べるだけだから、同じ場合は同じ場合で良い。
+  - 例えば、`people := []Person{{"Alice", 30},{"Bob", 25},{"Carol", 30}}`を年齢の降順でソートする場合、以下の２通りがソート後に考えられる（ソートが安定しない）。
+    - `[]Person{{"Bob", 25},{"Alice", 30},{"Carol", 30}}` 
+    - `[]Person{{"Bob", 25},{"Carol", 30},{"Alice", 30}}` 
+    - 年齢でソートすると、AliceとCarolのソートが安定しない。
+    - このような場合に、`sort.SliceStable`を使用することで、ソート前の並びのAlice->Carolに安定させることができる。
+  - 今回の1つの要素をソートする場合では過剰。
+- `slices.Sort`と`sort.StableSlice`では、`sort.StableSlice`の方が計算量が多い（lognだけ多い）。
+  - なので、安定性を求める必要がない場面では、`slices.Sort`を使用することが良い。
+- `sort.Slice`と`slices.Sort`は違う！！
+  - `slices.Sort`：数値・文字列を昇順でソート
+  - `sort.Slice`：`func Slice(x any, less func(i, j int) bool)`なので、なんでも渡せる。
+    - less は「インデックス i の要素を j より前に置くべきか」を真偽で返す関数
+    - less(i, j) が true を返す ＝「インデックス i の要素を j より前に置く」
+      - return s[i] < s[j] … 「i の値が小さいとき i を前に」→ 小さいものが先 → 昇順（小→大）
+      - return s[i] > s[j] … 「i の値が大きいとき i を前に」→ 大きいものが先 → 降順（大→小）
+- 文字列の昇順 ：`<` -> 大文字（A,B,...）、小文字（a,b,...）の順にASCIIの数字が小さくなっていく。
+- `input := map[string]int{}`の時
+```go
+for key, val := range input { // mapからキーを取り出しているので、順序を保証しない。
+		inverted[val] = append(inverted[val], key)
+	}
+```
+  - 上の`inverted[val]`でゼロ値を返すのでは？と一瞬疑った。
+  - しかし考えてみると、そもそもinvertedのキーとなる**valが空（nil）であるから、ゼロ値は返らない。** -> **修正：ループが0回だから、空のmapが返る（append処理は発生しない）。**
+  - もし、valがnilでなくて存在する値であったらゼロ値を返す。
+#### 反省
+- ASCIIに慣れた方が良い。
+#### 実装時間
+- 合計：約2時間
 ---
