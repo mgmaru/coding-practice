@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestCalcCumlativeSum(t *testing.T) {
+func TestCalcCumulativeSum(t *testing.T) {
 	cases := []struct {
 		name  string
 		input []int
@@ -20,7 +20,7 @@ func TestCalcCumlativeSum(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gotValue := calcCumlativeSum(c.input)
+			gotValue := calcCumulativeSum(c.input)
 			if !reflect.DeepEqual(gotValue, c.want) {
 				t.Errorf("期待する値と違います。gotValue= %v, want= %v", gotValue, c.want)
 			}

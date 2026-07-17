@@ -4,7 +4,7 @@ package collections
 // 入力: [1, 2, 3, 4]
 // 出力: [1, 3, 6, 10]
 
-func calcCumlativeSum(input []int) []int {
+func calcCumulativeSum(input []int) []int {
 	output := make([]int, 0, len(input))
 	for i, num := range input {
 		if len(output) == 0 { // i == 0でも良い？
