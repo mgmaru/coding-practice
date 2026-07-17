@@ -6,12 +6,10 @@ package collections
 
 func calcCumulativeSum(input []int) []int {
 	output := make([]int, 0, len(input))
-	for i, num := range input {
-		if len(output) == 0 { // i == 0でも良い？
-			output = append(output, num)
-			continue
-		}
-		output = append(output, output[i-1]+num)
+	sum := 0 // 修正：一時変数をおいて、デバッグ容易性を向上
+	for _, num := range input {
+		sum += num
+		output = append(output, sum)
 	}
 	return output
 }
