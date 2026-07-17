@@ -16,6 +16,9 @@ func TestCalcCumulativeSum(t *testing.T) {
 		{name: "SingleInput", input: []int{1}, want: []int{1}},
 		{name: "EmptyInput", input: []int{}, want: []int{}},
 		{name: "NilInput", input: nil, want: []int{}},
+		// 修正：テスト追加
+		{name: "AllNegativeIntegers", input: []int{-1, -3, -6}, want: []int{-1, -4, -10}},
+		{name: "IncludesPositiveAndNegativeIntegers", input: []int{-1, 5, -7, 8}, want: []int{-1, 4, -3, 5}},
 	}
 
 	for _, c := range cases {
