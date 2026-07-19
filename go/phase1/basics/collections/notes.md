@@ -453,3 +453,54 @@ func calcCumulativeSum(input []int) []int {
 #### 実装時間
 - 合計：約1時間
 ---
+### 2026/7/19
+#### やったこと
+- 14_moving_average.go実装
+- 14_moving_average_test.go実装
+#### わかったこと
+1. 繰り返し処理の書き方
+- `for i := 0; i < 10; i++` -> この書き方は古いらしい。
+- `for i := range 10` -> この書き方が推奨されているらしい（Go 1.22〜）
+2. スライディングウィンドウの実装
+  1. 自分の実装
+```go
+	for i, _ := range input { // iを1個ずつずらしていく
+		if i+number > len(input) { // 平均の計算対象となる数が要素を超えた場合は平均計算終わり
+			return movingAverageResult
+		}
+		// number分、inputから対象となる数を取り出して平均を計算する
+		targetNumsSum := 0
+		for j := range number { // number分要素を取り出す
+			targetNumsSum += input[i+j]
+		}
+		movingAverage := targetNumsSum / number
+		movingAverageResult = append(movingAverageResult, movingAverage)
+	}
+```
+- 自分の実装では、内側のループで毎回合計を計算しているので、計算量は`O(n)` -> n(窓の要素数)が大きい場合、計算量が膨大になる。
+  2. AIの回答
+```go
+	windowSum := 0
+	for i := range windowSize {
+		windowSum += input[i]
+	}
+	result = append(result, windowSum/windowSize)
+
+	for i := windowSize; i < len(input); i++ { // 修正 i：入ってくる数 i-windosSize：出ていく数
+		// 補足：もし、windowSizeがlenより大きかった場合、ループ処理には入らない。
+		windowSum += input[i] - input[i-windowSize]
+		movingAverage := windowSum / windowSize
+		result = append(result, movingAverage)
+	}
+	return result
+```
+- AIの回答では、どんなに窓の要素が多くても、計算量は`O(1)`
+#### 反省
+- 今回の問題は、数学的な要素が大きかった。
+- やはり、数学的なアルゴリズムの処理が苦手なことがわかった。
+- 基本的なアルゴリズムや、競プロを練習する必要がある。
+#### 実装時間
+- 合計：3時間40分
+  - 初期実装：1時間53分
+  - 修正：1時間47分
+---
