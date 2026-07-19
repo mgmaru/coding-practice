@@ -286,6 +286,9 @@ for i := range input {
 
 `number > len(input)` のとき、7 行目を消しても **ループ初回 `i=0` で `0+number > len(input)` が真** → 即 `return` で、**結果は同一**（空スライス）。空入力でも `range` が0回で空返しになり同じ。つまり 7 行目は **`06`/`07`/`13` で潰した「無くても同じ結果の分岐」** の再来。消せる。
 
+> ⚠ **重要な但し書き（この "余計" 判定は naive 構造限定）**: 上の「消せる」は、**内側ガード `if i+number > len(input) { return }`（14_moving_average.go:14）が `number > len(input)` を吸収している** という、*旧・naive 構造* を前提にした話。**観点1のスライディングウィンドウ版に書き換えると、この内側ガードごと消える**ので、吸収役がいなくなり **`number > len(input)` を弾く場所が消滅する** ―― その瞬間 **「余計」だったガードは "必須（load-bearing)" に反転する**。実際、滑らせる版は「最初の窓」を**無条件で `input[0..number-1]` まで読む**ため、`number > len(input)` だと (a) `make([]int, 0, len(input)-number+1)` の cap が **負**（例 空入力＋`number=3` → `0-3+1=-2` → `panic: makeslice: cap out of range`）、(b) 最初の窓ループが **範囲外アクセス panic**、の2重で壊れる。
+> **結論**: 観点1の書き換えを採るなら、**`number > len(input)` は削除してはならない**。観点1の rewrite が `if number <= 0 || number > len(input) { return []int{} }` と **1本に束ねて維持** しているのはこのため。**「このガードは余計」は "今の制御構造" を前提にした判定** ―― 構造をリファクタしたら **どのガードが load-bearing に戻ったかを必ず見直す**（今回の実地の学び）。なお `make` は必ず **このガードの後ろ** に置くこと（前に置くと負 cap で panic）。
+
 > ただし **`number <= 0` のガード（10 行目）は必須・load-bearing**。これを消すと `number == 0` で内側ループが0回→`targetNumsSum == 0`→`0 / 0` で **panic（整数のゼロ除算）**。「余計なのは 7 行目だけ、10 行目は消してはいけない」を区別できること。（観点1の書き換え例では `if number <= 0 || number > len(input)` と1本にまとめ、ループ境界 `i < len(input)` 側で右端を見ている。）
 
 ### 3-3. ループ途中の `return` は `break`／ループ境界化が素直
@@ -335,7 +338,7 @@ for i := 0; i+number <= len(input); i++ { ... } // 「窓が収まる間だけ�
 |---|---|---|---|
 | [ ] | `14_moving_average.go:13-23` | **窓和 `windowSum` を持ち越す**形へ。最初の窓だけ合計し、以降は `windowSum += input[i]-input[i-number]` で滑らせる。内側ループを消し **O(n·N)→O(n)**。狙い「窓を滑らせる」を変数で表す（観点1） | **要・②道具の主眼** |
 | [ ] | `14_moving_average.go:22` ＋ 型 | **契約を決める**: (a) spec 通り `[]float64`（`2.0,3.0,4.0`）にする か (b) `[]int` 切り捨てを **コメントで明記**。どちらかに寄せ、実装・コメント・テストを揃える（観点2・`07`） | **要・③仕様** |
-| [ ] | `14_moving_average.go:7` | 余計なガード `if number > len(input)` を削除（ループ境界に吸収される。観点3-2）。**`number <= 0` は残す**（0除算panic防止） | 要（②道具・`06`/`13`） |
+| [ ] | `14_moving_average.go:7,10` | **観点1（滑らせる版）を採るなら**: ガードを `if windowSize <= 0 \|\| windowSize > len(input) { return []int{} }` の **1本に束ねて維持**し、`make` を **その後ろ** に置く。`windowSize > len(input)` を消すと最初の窓ループで範囲外／負 cap で panic（観点3-2 の但し書き）。※naive 版のまま行くなら `windowSize > len(input)` は削除可・`windowSize <= 0` は必須 | 要（②道具・`06`/`13`／**構造依存**） |
 | [ ] | `14_moving_average.go:5` | cap を `len(input)-number+1` にタイト化（観点3-1。observ1の書き換えで自然にこうなる） | 任意（②nice） |
 | [ ] | `14_moving_average.go:13` | `for i, _ := range` → **`for i := range`**（`gofmt -s`。観点4） | 要（字面） |
 | [ ] | `14_moving_average.go:3` | 引数 `number` → **`windowSize`**（役割を語る。観点4） | 任意 |

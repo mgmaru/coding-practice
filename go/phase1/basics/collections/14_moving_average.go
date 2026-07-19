@@ -1,26 +1,25 @@
 package collections
 
-func calcMovingAverage(input []int, number int) []int {
+func calcMovingAverage(input []int, windowSize int) []int { //修正：平均はintで計算する。
+	// 修正：変数名をwindowSizeからwindowSizeに変更
 
-	movingAverageResult := make([]int, 0, len(input))
+	if windowSize <= 0 || windowSize > len(input) { // windowSize >= 1
+		return []int{}
+	}
+	result := make([]int, 0, len(input)-windowSize+1) // 修正：平均の計算の数は、入力のサイズ-窓の要素数+1
 
-	if number > len(input) { // error
-		return movingAverageResult
+	// 修正：最初の窓の合計を計算する
+	windowSum := 0
+	for i := range windowSize {
+		windowSum += input[i]
 	}
-	if number <= 0 { // number >= 1
-		return movingAverageResult
+	result = append(result, windowSum/windowSize)
+
+	for i := windowSize; i < len(input); i++ { // 修正 i：入ってくる数 i-windosSize：出ていく数
+		// 補足：もし、windowSizeがlenより大きかった場合、ループ処理には入らない。
+		windowSum += input[i] - input[i-windowSize]
+		movingAverage := windowSum / windowSize
+		result = append(result, movingAverage)
 	}
-	for i, _ := range input { // iを1個ずつずらしていく
-		if i+number > len(input) { // 平均の計算対象となる数が要素を超えた場合は平均計算終わり
-			return movingAverageResult
-		}
-		// number分、inputから対象となる数を取り出して平均を計算する
-		targetNumsSum := 0
-		for j := range number { // number分要素を取り出す
-			targetNumsSum += input[i+j]
-		}
-		movingAverage := targetNumsSum / number
-		movingAverageResult = append(movingAverageResult, movingAverage)
-	}
-	return movingAverageResult
+	return result
 }
