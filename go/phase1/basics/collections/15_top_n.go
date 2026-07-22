@@ -36,13 +36,11 @@ func displayTopN(input []Item, topN int) []Item {
 	})
 
 	items := make([]Item, 0, topN)
-
+	if len(validItems) < topN { // validItemsがtopNよりも少ない場合は、validItemsを全件表示
+		items = append(items, validItems...)
+		return items
+	}
 	for i := range topN {
-		if len(validItems) < topN { // validItemsがtopNよりも少ない場合は、validItemsを全件表示
-			items = append(items, validItems...)
-			return items
-		}
-
 		items = append(items, validItems[i])
 	}
 	return items
