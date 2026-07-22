@@ -9,13 +9,13 @@ type Item struct {
 
 func displayTopN(input []Item, topN int) []Item {
 
-	validItems := make([]Item, 0, len(input))
-
 	// input and topN check
-	if topN <= 0 || len(input) == 0 {
+	if topN <= 0 {
 		return []Item{}
 	}
 
+	// 修正：ガードの後に容量を確保
+	validItems := make([]Item, 0, len(input))
 	// frequency negative check
 	for _, e := range input {
 		if e.Frequency >= 0 {
@@ -35,13 +35,5 @@ func displayTopN(input []Item, topN int) []Item {
 		return validItems[i].Frequency > validItems[j].Frequency
 	})
 
-	items := make([]Item, 0, topN)
-	if len(validItems) < topN { // validItemsがtopNよりも少ない場合は、validItemsを全件表示
-		items = append(items, validItems...)
-		return items
-	}
-	for i := range topN {
-		items = append(items, validItems[i])
-	}
-	return items
+	return validItems[:min(topN, len(validItems))] // 修正：topNもしくはlenの少ない方を採用する
 }

@@ -521,3 +521,76 @@ func calcCumulativeSum(input []int) []int {
 ### 2026/7/22
 #### やったこと
 - 15_top_n.go / 15_top_n_test.go 実装レビュー＆修正
+#### 工夫したこと
+- 繰り返し処理に関係のない分岐を外に切り出した。
+1. 最初の実装
+```go
+for i := range topN {
+		if len(validItems) < topN { // validItemsがtopNよりも少ない場合は、validItemsを全件表示
+			items = append(items, validItems...)
+			return items
+		}
+		items = append(items, validItems[i])
+	}
+```
+2. 修正後の実装
+```go
+if len(validItems) < topN { // validItemsがtopNよりも少ない場合は、validItemsを全件表示
+	items = append(items, validItems...)
+	return items
+}
+for i := range topN {
+	items = append(items, validItems[i])
+}
+```
+#### 迷ったこと
+1. 自分の実装
+```go
+if topN <= 0 || len(input) == 0 {
+		return []Item{}
+	}
+
+// frequency negative check
+for _, e := range input {
+	if e.Frequency >= 0 {
+		validItems = append(validItems, e)
+	}
+}
+
+// validItems check
+if len(validItems) == 0 {
+	return []Item{}
+}
+```
+- `if topN <= 0 || len(input) == 0 {`の`len(input)==0`が余計という指摘を受けた。
+- 確かに、「inputが空」と「有効なinputが空」というのは本質的には同じ条件であり、どちらかといえば、「有効なinputが空」の方が本質的な条件になる。
+2. AIの実装
+```go
+if topN <= 0 { 
+		return []Item{}
+	}
+
+validItems := make([]Item, 0, len(input))
+
+for _, item := range input {
+	if item.Frequency >= 0 {
+		validItems = append(validItems, item)
+	}
+}
+
+if len(validItems) == 0 {
+	return []Item{}
+}	
+````
+- AI（Codex）に聞いたところ、私だったら削除すると明言していた。
+- **早期リターンは後続処理に進むべきでない条件を除外するためのもの**と考えると、無駄のない書き方ができるかもしれない。
+#### 反省
+- 早期リターンをして、無駄な条件を増やしている場合が多い。
+- 早期リターンは、**起こり得るケースをすべて冒頭に列挙するためのものではない。**
+- 早期リターンする場合は、以下を考える。
+  - 条件が被っていないかどうか。
+  - 後続処理に進むべきではない条件を除外するためのものであるか。
+- スライスの要素抽出操作がまだ慣れていない
+  - `slice[:n]`みたいな操作。
+- Goの組み込み関数を覚える。
+---
