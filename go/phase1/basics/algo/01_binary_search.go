@@ -5,7 +5,7 @@ package algo
 // 不変条件: 「答えがあるなら常に探索範囲 [lo, hi) の中に居る」を宣言してから書く。
 // TODO: 自分で実装する
 
-func getTargetIndex(input []int, target int) int {
+func getTargetIndexOriginal(input []int, target int) int {
 
 	m := make(map[int]int, len(input))
 	// キー：要素、値：indexとしてmapに格納
@@ -19,4 +19,50 @@ func getTargetIndex(input []int, target int) int {
 		return -1
 	}
 	return m[target] // 計算量O(1)
+}
+
+// ソート済みのスライスに対して二分探索を実行する関数
+func getTargetIndexBinarySearch(input []int, target int) int {
+
+	var l int // 探索範囲の最小要素のインデックス
+	var h int // 探索範囲の最大要素のインデックス
+	var m int // 探索範囲の真ん中の要素のインデックス
+
+	n := len(input) // nは固定値なので、あらかじめ変数に格納しておく（nが大キックなった時にいちいち、lenでサイズを計算すると計算量が爆増するため）
+	if n == 0 {
+		return -1
+	}
+
+	// 初期値
+	l = 0
+	h = n - 1
+	m = (l + h) / 2
+	for {
+		if target == input[m] { // targetがinput[m]と同じ場合はその時点で探索終了
+			for i := m - 1; i >= 0; i-- { // mから左に１ずつずらしていく
+				if target == input[i] {
+					m = i // 同じであればmを更新
+					continue
+				}
+				break // 違えばループを抜ける（重複要素の最小インデックスを確定）
+			}
+			return m
+		}
+		if target > input[m] { // もし、targetがmidより大きい場合、midを含む左側の要素を削除し、最小要素と真ん中のインデックスを更新
+			l = m + 1       // 最小を更新(midの１つ右の要素が最小要素)
+			m = (l + h) / 2 // 真ん中の要素を更新
+			// 最大要素は変わらない
+			if l > h { // 最小要素のインデックスが最大要素のインデックスを超えた場合、見つからないとして-1を返す
+				return -1
+			}
+		}
+		if target < input[m] { // もし、targetがmidよりも小さい場合、midを含む右側の要素を削除し、最大要素と真ん中のインデックスを更新
+			h = m - 1       // 最大を更新（midの１つ左の要素が最大要素）
+			m = (l + h) / 2 // 真ん中の要素を更新
+			// 最小要素は変わらない
+			if h < l { // 最大要素のインデックスが最小要素のインデックスよりも小さくなった場合、見つからないとして-1を返す
+				return -1
+			}
+		}
+	}
 }
