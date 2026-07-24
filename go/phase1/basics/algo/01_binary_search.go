@@ -42,7 +42,7 @@ func getTargetIndexBinarySearch(input []int, target int) int {
 			for lo < hi { // 継続条件は loとhiが違う場合 -> lo==hiとなった場合はその時点で終了
 				mid = lo + (hi-lo)/2
 				if input[mid] == target { // midがtargetと一致する場合は、midよりも小さい範囲に境界がある。
-					hi = mid - 1 //探索範囲を更新
+					hi = mid //探索範囲を更新 // 修正：hi = mid-1だと、midが求める境界なのに、捨ててしまう。
 				}
 				if input[mid] != target { // midがtargetと一致する場合は、midよりも大きい範囲に教会がある。
 					lo = mid + 1 // 探索範囲を更新
