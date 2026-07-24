@@ -24,7 +24,7 @@ func getTargetIndexOriginal(input []int, target int) int {
 // ソート済みのスライスに対して二分探索を実行する関数
 func getTargetIndexBinarySearch(input []int, target int) int {
 
-	n := len(input) // nは固定値なので、あらかじめ変数に格納しておく（nが大キックなった時にいちいち、lenでサイズを計算すると計算量が爆増するため）
+	n := len(input)
 	if n == 0 {
 		return -1
 	}
@@ -33,7 +33,7 @@ func getTargetIndexBinarySearch(input []int, target int) int {
 	l := 0
 	h := n - 1
 	for l <= h {
-		m := (l + h) / 2        // 修正：mの更新処理は共通処理なので最初にまとめた。// 追記：1回のループ処理でmは固定なので、違う分岐に入ることはない。
+		m := l + (h-l)/2        // 修正：mの更新処理は共通処理なので最初にまとめた。// 追記：1回のループ処理でmは固定なので、違う分岐に入ることはない。 // 修正：オーバーフローを修正
 		if target == input[m] { // targetがinput[m]と同じ場合はその時点で探索終了
 			// 初期の探索範囲
 			lo := 0
