@@ -37,6 +37,11 @@ func TestGetTargetIndexOriginal(t *testing.T) {
 		{name: "TargetSmallerThanAll", input: []int{1, 3, 5, 7, 9, 11}, target: 0, want: -1},
 		{name: "TargetLargerThanAll", input: []int{1, 3, 5, 7, 9, 11}, target: 100, want: -1},
 		{name: "InputContainsNegativeInteger", input: []int{-11, -7, -3, 1, 5, 9}, target: 1, want: 3},
+		// 修正：テスト追加
+		// 追記1（無限ループ）の回帰 ―― 奇数長・全重複。hi が lo の下へ突き抜ける形
+		{name: "AllSameOddLength", input: []int{7, 7, 7}, target: 7, want: 0},
+		// 追記2（最左取り違え）の回帰 ―― 非target要素の後ろに target が2つ以上
+		{name: "NonTargetThenDupTargets", input: []int{1, 7, 7, 7, 9}, target: 7, want: 1},
 	}
 
 	for _, c := range cases {
@@ -72,6 +77,11 @@ func TestGetTargetIndexBinarySearch(t *testing.T) {
 		{name: "TargetSmallerThanAll", input: []int{1, 3, 5, 7, 9, 11}, target: 0, want: -1},
 		{name: "TargetLargerThanAll", input: []int{1, 3, 5, 7, 9, 11}, target: 100, want: -1},
 		{name: "InputContainsNegativeInteger", input: []int{-11, -7, -3, 1, 5, 9}, target: 1, want: 3},
+		// 修正：テスト追加
+		// 追記1（無限ループ）の回帰 ―― 奇数長・全重複。hi が lo の下へ突き抜ける形
+		{name: "AllSameOddLength", input: []int{7, 7, 7}, target: 7, want: 0},
+		// 追記2（最左取り違え）の回帰 ―― 非target要素の後ろに target が2つ以上
+		{name: "NonTargetThenDupTargets", input: []int{1, 7, 7, 7, 9}, target: 7, want: 1},
 	}
 
 	for _, c := range cases {
