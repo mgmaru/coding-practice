@@ -39,14 +39,21 @@ func getTargetIndexBinarySearch(input []int, target int) int {
 	m = (l + h) / 2
 	for {
 		if target == input[m] { // targetがinput[m]と同じ場合はその時点で探索終了
-			for i := m - 1; i >= 0; i-- { // mから左に１ずつずらしていく
-				if target == input[i] {
-					m = i // 同じであればmを更新
-					continue
+			// 初期の探索範囲
+			lo := 0
+			hi := m
+			mid := lo + (hi-lo)/2
+			for lo != hi { // 継続条件は loとhiが違う場合 -> lo==hiとなった場合はその時点で終了
+				if input[mid] == target { // midがtargetと一致する場合は、midよりも小さい範囲に境界がある。
+					hi = mid - 1 //探索範囲を更新
+					mid = lo + (hi-lo)/2
 				}
-				break // 違えばループを抜ける（重複要素の最小インデックスを確定）
+				if input[mid] != target { // midがtargetと一致する場合は、midよりも大きい範囲に教会がある。
+					lo = mid + 1 // 探索範囲を更新
+					mid = lo + (hi-lo)/2
+				}
 			}
-			return m
+			return lo
 		}
 		if target > input[m] { // もし、targetがmidより大きい場合、midを含む左側の要素を削除し、最小要素と真ん中のインデックスを更新
 			l = m + 1       // 最小を更新(midの１つ右の要素が最小要素)
