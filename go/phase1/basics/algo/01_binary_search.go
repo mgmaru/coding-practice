@@ -5,7 +5,7 @@ package algo
 // 不変条件: 「答えがあるなら常に探索範囲 [lo, hi) の中に居る」を宣言してから書く。
 // TODO: 自分で実装する
 
-func getTargetIndex(input []int, target int) int {
+func getTargetIndexOriginal(input []int, target int) int {
 
 	m := make(map[int]int, len(input))
 	// キー：要素、値：indexとしてmapに格納
@@ -19,4 +19,43 @@ func getTargetIndex(input []int, target int) int {
 		return -1
 	}
 	return m[target] // 計算量O(1)
+}
+
+// ソート済みのスライスに対して二分探索を実行する関数
+func getTargetIndexBinarySearch(input []int, target int) int {
+
+	n := len(input)
+	if n == 0 {
+		return -1
+	}
+
+	// 初期値
+	l := 0
+	h := n - 1
+	for l <= h {
+		m := l + (h-l)/2        // 修正：mの更新処理は共通処理なので最初にまとめた。// 追記：1回のループ処理でmは固定なので、違う分岐に入ることはない。 // 修正：オーバーフローを修正
+		if target == input[m] { // targetがinput[m]と同じ場合はその時点で探索終了
+			// 初期の探索範囲
+			lo := 0
+			hi := m
+			mid := lo + (hi-lo)/2
+			for lo < hi { // 継続条件は loとhiが違う場合 -> lo==hiとなった場合はその時点で終了
+				mid = lo + (hi-lo)/2
+				if input[mid] == target { // midがtargetと一致する場合は、midよりも小さい範囲に境界がある。
+					hi = mid //探索範囲を更新 // 修正：hi = mid-1だと、midが求める境界なのに、捨ててしまう。
+				}
+				if input[mid] != target { // midがtargetと一致する場合は、midよりも大きい範囲に教会がある。
+					lo = mid + 1 // 探索範囲を更新
+				}
+			}
+			return lo
+		}
+		if target > input[m] { // もし、targetがmidより大きい場合、midを含む左側の要素を削除し、最小要素と真ん中のインデックスを更新
+			l = m + 1 // 最小を更新(midの１つ右の要素が最小要素)
+		}
+		if target < input[m] { // もし、targetがmidよりも小さい場合、midを含む右側の要素を削除し、最大要素と真ん中のインデックスを更新
+			h = m - 1 // 最大を更新（midの１つ左の要素が最大要素）
+		}
+	}
+	return -1
 }
