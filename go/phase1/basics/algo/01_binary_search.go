@@ -24,45 +24,37 @@ func getTargetIndexOriginal(input []int, target int) int {
 // ソート済みのスライスに対して二分探索を実行する関数
 func getTargetIndexBinarySearch(input []int, target int) int {
 
-	var l int // 探索範囲の最小要素のインデックス
-	var h int // 探索範囲の最大要素のインデックス
-	var m int // 探索範囲の真ん中の要素のインデックス
-
 	n := len(input) // nは固定値なので、あらかじめ変数に格納しておく（nが大キックなった時にいちいち、lenでサイズを計算すると計算量が爆増するため）
 	if n == 0 {
 		return -1
 	}
 
 	// 初期値
-	l = 0
-	h = n - 1
-	m = (l + h) / 2
+	l := 0
+	h := n - 1
 	for l <= h {
+		m := (l + h) / 2        // 修正：mの更新処理は共通処理なので最初にまとめた。// 追記：1回のループ処理でmは固定なので、違う分岐に入ることはない。
 		if target == input[m] { // targetがinput[m]と同じ場合はその時点で探索終了
 			// 初期の探索範囲
 			lo := 0
 			hi := m
 			mid := lo + (hi-lo)/2
-			for lo != hi { // 継続条件は loとhiが違う場合 -> lo==hiとなった場合はその時点で終了
+			for lo < hi { // 継続条件は loとhiが違う場合 -> lo==hiとなった場合はその時点で終了
+				mid = lo + (hi-lo)/2
 				if input[mid] == target { // midがtargetと一致する場合は、midよりも小さい範囲に境界がある。
 					hi = mid - 1 //探索範囲を更新
-					mid = lo + (hi-lo)/2
 				}
 				if input[mid] != target { // midがtargetと一致する場合は、midよりも大きい範囲に教会がある。
 					lo = mid + 1 // 探索範囲を更新
-					mid = lo + (hi-lo)/2
 				}
 			}
 			return lo
 		}
 		if target > input[m] { // もし、targetがmidより大きい場合、midを含む左側の要素を削除し、最小要素と真ん中のインデックスを更新
-			l = m + 1       // 最小を更新(midの１つ右の要素が最小要素)
-			m = (l + h) / 2 // 真ん中の要素を更新
+			l = m + 1 // 最小を更新(midの１つ右の要素が最小要素)
 		}
 		if target < input[m] { // もし、targetがmidよりも小さい場合、midを含む右側の要素を削除し、最大要素と真ん中のインデックスを更新
-			h = m - 1       // 最大を更新（midの１つ左の要素が最大要素）
-			m = (l + h) / 2 // 真ん中の要素を更新
-			// 最小要素は変わらない
+			h = m - 1 // 最大を更新（midの１つ左の要素が最大要素）
 		}
 	}
 	return -1
