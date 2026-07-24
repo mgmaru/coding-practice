@@ -1,7 +1,6 @@
 package algo
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -34,12 +33,16 @@ func TestGetTargetIndexOriginal(t *testing.T) {
 		{name: "AllInputSameElementAndIncludedTarget", input: []int{3, 3, 3, 3, 3, 3}, target: 3, want: 0},
 		{name: "AllInputSameElementAndNotIncludedTarget", input: []int{3, 3, 3, 3, 3, 3}, target: 1, want: -1}, // 不要なような気がするが、Includedを確かめたら、Not Includedも確かめるべきかと思った
 		// {name: "InputContainsNegativeInteger", input: []int{1, -3, 5, -7, 9, -11}, target: -7, want: 3},
+		// 修正：テスト追加
+		{name: "TargetSmallerThanAll", input: []int{1, 3, 5, 7, 9, 11}, target: 0, want: -1},
+		{name: "TargetLargerThanAll", input: []int{1, 3, 5, 7, 9, 11}, target: 100, want: -1},
+		{name: "InputContainsNegativeInteger", input: []int{-11, -7, -3, 1, 5, 9}, target: 1, want: 3},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			gotValue := getTargetIndexOriginal(c.input, c.target)
-			if !reflect.DeepEqual(gotValue, c.want) {
+			if gotValue != c.want { // 修正：int型の変数を比較するのに、DeepEqualは余計
 				t.Errorf("期待する値と違います。gotValue= %v, want= %v", gotValue, c.want)
 			}
 		})
@@ -66,12 +69,15 @@ func TestGetTargetIndexBinarySearch(t *testing.T) {
 		{name: "AllInputSameElementAndIncludedTarget", input: []int{3, 3, 3, 3, 3, 3}, target: 3, want: 0},
 		{name: "AllInputSameElementAndNotIncludedTarget", input: []int{3, 3, 3, 3, 3, 3}, target: 1, want: -1}, // 不要なような気がするが、Includedを確かめたら、Not Includedも確かめるべきかと思った
 		// {name: "InputContainsNegativeInteger", input: []int{1, -3, 5, -7, 9, -11}, target: -7, want: 3}, // 修正：ソートできていないのでそもそも二分探索の利用条件に合っていないので削除
+		{name: "TargetSmallerThanAll", input: []int{1, 3, 5, 7, 9, 11}, target: 0, want: -1},
+		{name: "TargetLargerThanAll", input: []int{1, 3, 5, 7, 9, 11}, target: 100, want: -1},
+		{name: "InputContainsNegativeInteger", input: []int{-11, -7, -3, 1, 5, 9}, target: 1, want: 3},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			gotValue := getTargetIndexBinarySearch(c.input, c.target)
-			if !reflect.DeepEqual(gotValue, c.want) {
+			if gotValue != c.want { // 修正：int型の変数を比較するのに、DeepEqualは余計
 				t.Errorf("期待する値と違います。gotValue= %v, want= %v", gotValue, c.want)
 			}
 		})
