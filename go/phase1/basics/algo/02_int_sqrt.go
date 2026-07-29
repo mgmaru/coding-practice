@@ -8,10 +8,7 @@ package algo
 // アルゴリズム整理
 // k*k < n となるような最大の整数kを求める　-> k*k < n と k*k > n と切り替わる境目を見つける
 func findLargestInteger(n int) int {
-	if n < 0 {
-		return n
-	}
-	if n == 1 {
+	if n < 0 || n == 1 {
 		return n
 	}
 	// 初期値計算
