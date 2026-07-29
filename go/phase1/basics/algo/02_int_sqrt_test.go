@@ -13,22 +13,22 @@ import "testing"
 // TODO: テストを書く
 func TestFindLargestInteger(t *testing.T) {
 	cases := []struct {
-		name  string
-		input int // n
-		want  int // k
+		name string
+		n    int // n
+		want int // k
 	}{
-		{name: "normal", input: 26, want: 5},
-		{name: "inputNisZero", input: 0, want: 0},
-		{name: "inputNisOne", input: 1, want: 1},
-		{name: "perfectSquare", input: 4, want: 2},
-		{name: "perfectSquare2", input: 25, want: 5},
-		{name: "largeInputN", input: 2000000000, want: 44721}, // int: -2,147,483,648 - 2,147,483,647
-		{name: "NisNegativeInteger", input: -1, want: -1},     // Nが負だったら、入力のnをそのまま返す
+		{name: "normal", n: 26, want: 5},
+		{name: "nNisZero", n: 0, want: 0},
+		{name: "nNisOne", n: 1, want: 1},
+		{name: "perfectSquare", n: 4, want: 2},
+		{name: "perfectSquare2", n: 25, want: 5},
+		{name: "largenN", n: 2000000000, want: 44721}, // int: -2,147,483,648 - 2,147,483,647
+		{name: "NisNegativeInteger", n: -1, want: -1}, // Nが負だったら、入力のnをそのまま返す
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gotValue := findLargestInteger(c.input)
+			gotValue := findLargestInteger(c.n)
 
 			if gotValue != c.want {
 				t.Errorf("期待する値と違います。gotValue=%d, want=%d", gotValue, c.want)
