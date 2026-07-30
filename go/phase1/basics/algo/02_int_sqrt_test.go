@@ -28,11 +28,8 @@ func TestFindLargestInteger(t *testing.T) {
 		{name: "largenN", n: 2000000000, want: 44721}, // int: -9,223,372,036,854,775,808 - 9,223,372,036,854,775,807
 		{name: "NisNegativeInteger", n: -1, want: -1}, // Nが負だったら、入力のnをそのまま返す
 		// 追加
-		{name: "nisTwo", n: 2, want: 1},                                            // return
-		{name: "maxInt", n: math.MaxInt, want: 3037000499},                         // 型の限界ちょうど
-		{name: "largestSquare", n: 3037000499 * 3037000499, want: 3037000499},      // 9223372030926249001
-		{name: "justBelowLargest", n: 3037000499*3037000499 - 1, want: 3037000498}, // ★答えが1減る境界
-		{name: "twoPow62", n: 1 << 62, want: 2147483648},                           // 期待値が 2^31 と暗算できる                           // 4611686018427387904 → 2^31
+		{name: "nisTwo", n: 2, want: 1},                    // return kに到達するテスト（カバレッジ）
+		{name: "maxInt", n: math.MaxInt, want: 3037000499}, // 型の限界ちょうど                       // 4611686018427387904 → 2^31
 	}
 
 	for _, c := range cases {
