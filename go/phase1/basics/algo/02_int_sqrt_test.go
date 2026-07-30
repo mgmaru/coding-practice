@@ -14,7 +14,7 @@ import (
 //   - 大きな n: k*k のオーバーフローに注意（k <= n/k へ書き換え可）
 //
 // TODO: テストを書く
-func TestFindLargestInteger(t *testing.T) {
+func TestIntSqrt(t *testing.T) {
 	cases := []struct {
 		name string
 		n    int // n : 非負整数、入力
@@ -34,7 +34,7 @@ func TestFindLargestInteger(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gotValue := findLargestInteger(c.n)
+			gotValue := intSqrt(c.n)
 
 			if gotValue != c.want {
 				t.Errorf("期待する値と違います。gotValue=%d, want=%d", gotValue, c.want)
