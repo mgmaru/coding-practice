@@ -17,19 +17,19 @@ import (
 func TestFindLargestInteger(t *testing.T) {
 	cases := []struct {
 		name string
-		n    int // n
-		want int // k
+		n    int // n : 非負整数、入力
+		want int // k :floor(sqrt(n))  // floor(x): floorはx以下の最大の整数を求める
 	}{
 		{name: "normal", n: 26, want: 5},
-		{name: "nNisZero", n: 0, want: 0},
-		{name: "nNisOne", n: 1, want: 1},
+		{name: "nIsZero", n: 0, want: 0},
+		{name: "nIsOne", n: 1, want: 1},
 		{name: "perfectSquare", n: 4, want: 2},
 		{name: "perfectSquare2", n: 25, want: 5},
 		{name: "largenN", n: 2000000000, want: 44721}, // int: -9,223,372,036,854,775,808 - 9,223,372,036,854,775,807
 		{name: "NisNegativeInteger", n: -1, want: -1}, // Nが負だったら、入力のnをそのまま返す
 		// 追加
 		{name: "nisTwo", n: 2, want: 1},                    // return kに到達するテスト（カバレッジ）
-		{name: "maxInt", n: math.MaxInt, want: 3037000499}, // 型の限界ちょうど                       // 4611686018427387904 → 2^31
+		{name: "maxInt", n: math.MaxInt, want: 3037000499}, // 型の限界ちょうど
 	}
 
 	for _, c := range cases {
