@@ -6,9 +6,9 @@ package algo
 // TODO: 自分で実装する
 
 // アルゴリズム整理
-// k*k <= n となるような最大の整数kを求める　-> k*k < n と k*k > n と切り替わる境目を見つける
-func findLargestInteger(n int) int {
-	if n < 2 { // 修正：n < 0 || n == 1 -> n < 2　に集約
+// k*k <= n となるような最大の整数kを求める -> k*k < n と k*k > n と切り替わる境目を見つける
+func intSqrt(n int) int {
+	if n < 2 { // 修正：n < 0 || n == 1 -> n < 2 に集約
 		return n
 	}
 	// 初期値計算
@@ -20,8 +20,7 @@ func findLargestInteger(n int) int {
 		if mid <= n/mid {     // mid*mid <= nだったら、見つける整数はmid以上
 			lo = mid + 1 // 最小値を更新
 			k = mid      // ただし、このmidは求める整数の候補になりうるので残す。 // ここ重要！！
-		}
-		if mid > n/mid { // mid*mid > n だったら、見つける整数はmid未満
+		} else { // mid*mid > n だったら、見つける整数はmid未満
 			hi = mid // 最大値を更新
 		}
 	}
