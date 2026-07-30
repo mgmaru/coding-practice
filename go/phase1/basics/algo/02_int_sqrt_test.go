@@ -25,7 +25,7 @@ func TestFindLargestInteger(t *testing.T) {
 		{name: "nIsOne", n: 1, want: 1},
 		{name: "perfectSquare", n: 4, want: 2},
 		{name: "perfectSquare2", n: 25, want: 5},
-		{name: "largenN", n: 2000000000, want: 44721}, // int: -9,223,372,036,854,775,808 - 9,223,372,036,854,775,807
+		{name: "largeN", n: 2000000000, want: 44721},  // int: -9,223,372,036,854,775,808 - 9,223,372,036,854,775,807
 		{name: "NisNegativeInteger", n: -1, want: -1}, // Nが負だったら、入力のnをそのまま返す
 		// 追加
 		{name: "nisTwo", n: 2, want: 1},                    // return kに到達するテスト（カバレッジ）
